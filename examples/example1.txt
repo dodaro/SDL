@@ -1,0 +1,21 @@
+@entity color: value: any;
+@entity node: value: int;
+@entity edge: node1: node, node2: node;
+@entity assign: node: node, color: color;
+
+define node as n
+    from edge, edge as e2
+	where node1=n and e2.node1=n;
+
+define color as c
+    from assign, node as n
+	where color=c and value=5;
+
+
+guess exactly 1 a: (c) with assign(node=n, color=c) as a 
+	from node as n, color as c
+		where n;
+
+define node
+	from node as n, assign as a 
+		where a.node=n.value;

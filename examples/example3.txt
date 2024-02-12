@@ -1,0 +1,30 @@
+@entity resolution: value: int;
+@entity video: type: str;
+@entity f: video: video, resolution: resolution, bit_rate: bit_rate, sat_value: sat;
+@entity bit_rate: value: int;
+@entity sat: value: int;
+@entity assign: bit_rate: bit_rate, sat_value: sat;
+
+
+define f
+	from video as v, sat
+		where f.video=v and sat_value=sat;
+
+define assign as a
+	from bit_rate as b, sat as s
+		where a.sat_value=s and b=a.bit_rate;
+
+define sat
+	from assign as a, sat as s2
+		where a=s2;
+
+@entity bandwidth: value: int;
+
+guess exactly 1 a: (video, r) with bit_rate(value=1) as b, assign(bit_rate=b, sat_value=s) as a, sat(value=2) as s
+	from video, resolution as r
+		where r;
+
+
+
+
+
