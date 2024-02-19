@@ -1,4 +1,7 @@
+import sys
+import fileinput
 from lark import Lark, Transformer, exceptions, Tree
+from optparse import OptionParser
 
 entities = {} #dizionario con chiave nome dell'entità e valore la lista dei parametri e rispettivi tipi
 guess={} #dizionario degli alias ed entità definite nel costrutto guess
@@ -242,15 +245,20 @@ class CheckTransformer(Transformer):
 
 
 if __name__ == '__main__':
-	code=""
-	with open('examples/example3.txt', 'r') as file:
-	    code = file.read()
+	parser = OptionParser(usage = "Usage: %prog [options] [input_files]")
+	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
+	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
+	(options, args) = parser.parse_args()
+	code=""	
+	for line in fileinput.input(args):
+		code += line		
 	try:
 		parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())
 		parser_entities.parse(code)
 		parser_check = Lark(grammar, parser='lalr', transformer=CheckTransformer())
-		tree=parser_check.parse(code)
-		print(tree.pretty())
+		tree=parser_check.parse(code)		
+		if options.verbose:
+			print(tree.pretty())
 	except exceptions.LarkError as e:
 		print(f"Parsing error: {e}")
 	except Exception as e:
