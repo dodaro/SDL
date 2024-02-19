@@ -1,49 +1,46 @@
 from lark import Lark, Transformer, exceptions, Tree
 
 entities = {} #dizionario con chiave nome dell'entità e valore la lista dei parametri e rispettivi tipi
-guess={} #dizionario degli alias ed entità definite nel from e nel with del costrutto guess
+guess={} #dizionario degli alias ed entità definite nel costrutto guess
 
 grammar = """
 	start:  _statement+
 	_statement: entity | define | guess
 	entity: "@entity" entity_declaration SEMICOLON
-	entity_declaration: NAME COLON declarations
+	entity_declaration: ENTITY_NAME COLON declarations
 	declarations: declaration (COMMA declaration)*
 	declaration: NAME COLON type
 	define: definition from_statement where?
-	definition: "define" NAME as_statement?
+	definition: "define" ENTITY_NAME as_statement?
 	as_statement: "as" NAME
 	from_statement: "from" single_entity (COMMA single_entity)*
-	single_entity: NAME ("as" NAME)?
+	single_entity: ENTITY_NAME ("as" NAME)?
 	where: "where" where_statement (AND where_statement)* SEMICOLON
-	where_statement: (NAME DOT)? NAME EQUALS var
-	guess: guess_statement with_guess from_guess where_guess SEMICOLON
-	guess_statement: "guess" guess_times guess_definition
-	guess_times: times INT (AND times INT)*
-	guess_definition: NAME (COLON brackets)? (COMMA guess_definition)*
-	brackets: OPEN_BRACKET inside_brackets (COMMA inside_brackets)* CLOSED_BRACKET
-	inside_brackets: condition (bool_operator condition)*| value 
-	condition: NOT? value ((operator (value | INT | STR)) | in_stat)
-	value: NAME (DOT NAME)*
-	var:  INT | STR | NAME (DOT NAME)* 
+	where_statement: (NAME | ENTITY_NAME) DOT NAME (operator | ASSIGN) var
+	guess: "guess" from_guess where_guess? guess_times guess_definition+ SEMICOLON
 	from_guess: "from" guess_entity (COMMA guess_entity)*
-	with_guess: "with" with_statement (COMMA with_statement)* 
-	with_statement: NAME OPEN_BRACKET NAME EQUALS var (COMMA NAME EQUALS var)* CLOSED_BRACKET guess_as
-	guess_entity: NAME ("as" NAME)?
-	guess_as: ("as" NAME)
-	where_guess: "where" NAME (COMMA NAME)*
-	in_stat: IN /[a-z_][a-z0-9_]*/	
+	guess_entity: ENTITY_NAME ("as" NAME)?
+	where_guess: "where"  where_guess_statement (AND where_guess_statement)*
+	where_guess_statement: (NAME | ENTITY_NAME) DOT NAME (operator | ASSIGN) var
+	guess_times: times INT (AND times INT)*
+	guess_definition: ENTITY_NAME guess_from? guess_where
+	guess_from: "from" entity_guess (COMMA guess_entity)*
+	entity_guess: ENTITY_NAME ("as" NAME)?
+	guess_where: "where"  guess_where_statement (AND guess_where_statement)*
+	guess_where_statement: (NAME | ENTITY_NAME) DOT NAME (operator | ASSIGN) var
+	
+	var:  INT | STR | (NAME | ENTITY_NAME) (DOT NAME)* 		
 	operator: EQUALITY | LT | LE | GT | GE | NOTEQUAL
 	bool_operator: AND | OR
 	times: EXACTLY | ATLEAST | ATMOST
-	type: ANY | STRING | INTEGER | custom_type
-	custom_type: NAME
+	type: ANY | STRING | INTEGER | ENTITY_NAME
 	NAME: /[a-z_][a-z0-9_]*/
+	ENTITY_NAME: /[A-Z][a-z0-9_]*/
 	COLON: ":"
 	SEMICOLON: ";"
 	COMMA: ","
 	DOT: "."
-	EQUALS: "="
+	ASSIGN: "="
 	OPEN_BRACKET: "("
 	CLOSED_BRACKET: ")"
 	EQUALITY: "=="
@@ -52,7 +49,6 @@ grammar = """
 	GT: ">"
 	LT: "<"
 	LE: "<="
-	IN: "in"
 	AND: "and"
 	NOT: "not"
 	OR: "or"
@@ -82,9 +78,6 @@ class DeclarationTransformer(Transformer):
 			attr=declarations[i].children
 			token=attr[2].children
 			attr_type=token[0] 
-			if(isinstance(token[0], Tree)): #nel caso in cui l'attributo sia un custom_type
-				custom_type=token[0].children
-				attr_type=custom_type[0]
 			if(attr_type==entity_name): #si definisce come tipo dell'attributo l'entità stessa
 				raise ValueError("Invalid syntax")
 			attr[0].type=str(attr_type) #salvo il tipo dell'attributo nel token
@@ -93,9 +86,7 @@ class DeclarationTransformer(Transformer):
 	def guess(self, args):
 		self.count_guess+=1
 		guess[self.count_guess]=[]
-	def guess_as(self, args):
-		if(args[0] in guess[self.count_guess]):
-			raise ValueError(f"Alias already defined: {args[0]}")
+	def guess_definition(self, args):
 		guess[self.count_guess].append(args[0])
 	def guess_entity(self, args):
 		if(len(args)>1):
@@ -112,17 +103,14 @@ class CheckTransformer(Transformer):
 		self.declared_alias={} #dizionario degli alias dichiarati nel from di ogni define e con valore l'entità
 		self.defined_entities=set() #entità definite nel from di ogni define
 		self.attributes={} #dizionario con chiave l'entità/l'alias e valore la lista degli attributi, inizializzato ad ogni define
-		self.defined_node="" #entità definita nella define
-		self.redefined_node="" #alias dell'entità definita nella define
-		self.with_attributes=[] #lista contenente gli attributi delle entità definite nel with
+		self.defined_entity="" #entità definita nella define
+		self.redefined_entity="" #alias dell'entità definita nella define
+		self.guess_alias={}
+		self.guess_entities=set()
 		self.count_guess=0
-	def custom_type(self, args):
-		if(not args[0] in entities.keys()):
-			raise ValueError(f"Unrecognized custom type: {args[0]}")
-		return f"{args[0]}"
 	def define(self, args):
-		self.redefined_node=""
-		self.defined_node=""
+		self.redefined_entity=""
+		self.defined_entity=""
 		return f"{args[0]} {args[1]} {args[2]}"
 	def from_statement(self, args):
 		return " from "+ self.print_stat(args)+ "\n"
@@ -138,19 +126,19 @@ class CheckTransformer(Transformer):
 		self.declared_alias={}
 		self.defined_entities=set()
 		self.attributes={}
-		self.defined_node=args[0]
+		self.defined_entity=args[0]
 		attr=entities[args[0]]
 		all_attr=[]
 		for i in range(len(attr)):
 			all_attr.append(attr[i]) 
-		self.attributes[self.defined_node]=all_attr
+		self.attributes[self.defined_entity]=all_attr
 		if(len(args)>1):
 			return f"define {args[0]} {args[1]} \n"
 		return f"define {args[0]} \n"
 	def as_statement(self, args):
 		if(args[0] in entities.keys()):
 			raise ValueError(f"Invalid alias: {args[0]}")
-		self.redefined_node=args[0]
+		self.redefined_entity=args[0]
 		return f"as {args[0]}"
 	def single_entity(self, args):
 		if(not args[0] in entities.keys()):
@@ -159,12 +147,12 @@ class CheckTransformer(Transformer):
 		if(len(args)>1): #se è stato definito l'alias aggiungo in declared_alias altrimenti in defined_entities
 			if(args[1] in entities.keys()):
 				raise ValueError(f"Invalid alias: {args[1]}")
-			if(args[1] in self.declared_alias or args[1]==self.redefined_node):
+			if(args[1] in self.declared_alias or args[1]==self.redefined_entity):
 				raise ValueError(f"Alias already defined: {args[1]}")
 			self.declared_alias[args[1]]=args[0]
 			var=args[1]
 		else:
-			if(args[0] in self.defined_entities or args[0]==self.defined_node):
+			if(args[0] in self.defined_entities or args[0]==self.defined_entity):
 				raise ValueError(f"Entity already defined: {args[0]}")
 			self.defined_entities.add(args[0])
 			var=args[0]
@@ -177,58 +165,38 @@ class CheckTransformer(Transformer):
 			return f"{args[0]} as {args[1]}"
 		return f"{args[0]}"
 	def var(self, args):
-		return args
+		return self.print_stat(args)
 	def args_type(self, args):	
 		return args[0]
 	def where_statement(self, args):
-		cond=args[0]==self.redefined_node or args[0]==self.defined_node	
-		if(len(args)>3):
-			if(cond):
-				args[0]=self.defined_node
-			else:
-				if(not args[0] in self.declared_alias.keys() and not args[0] in self.defined_entities):
-					raise ValueError(f"Undefined entity or alias: {args[0]}")
-			if(not args[2].value in self.attributes[args[0]]):
-				raise ValueError(f"Attribute {args[2]} of entity {args[0]} is not defined")
-			args_4=self.args_type(args[4])
-			if(len(args[4])>1):
-				for i in range(1, len(args[4])):
-					args_4+=args[4][i]
-			return f"{args[0]}{args[1]}{args[2]} {args[3]} {args_4}"
+		entity=args[0]
+		if(not (args[0]==self.redefined_entity or (self.redefined_entity=="" and args[0]==self.defined_entity))):
+			if(not args[0] in self.declared_alias.keys()and not args[0] in self.defined_entities):
+					raise ValueError(f"{args[0]} is not defined")
 		else:
-			find=False
-			for entity in self.defined_entities:
-				if any(args[0]==attr.value for attr in self.attributes[entity]):
-					if(find):
-						raise ValueError(f"The reference to the attribute {args[0]} is ambiguous")
-					find=True
-			if(not find):
-				for alias in self.declared_alias.keys():
-					if any(args[0]==attr.value for attr in self.attributes[alias]):
-						if(find):
-							raise ValueError(f"The reference to the attribute {args[0]} is ambiguous")
-						find=True
-			if(not find and not (args[0] in self.declared_alias.keys() or args[0] in self.defined_entities or cond)):
-				if(not any(args[0]==attr.value for attr in self.attributes[self.defined_node])):
-						raise ValueError(f"Attribute {args[0]} is not defined")
-			args_2=self.args_type(args[2])
-			if(len(args[2])>1):
-				for i in range(1, len(args[2])):
-					args_2+=args[2][i]
-			return f"{args[0]} {args[1]} {args_2}"
+			args[0]=self.defined_entity
+		if(not args[2].value in self.attributes[args[0]]):
+			raise ValueError(f"Attribute {args[2]} of entity {args[0]} is not defined")
+		args_4=self.args_type(args[4])
+		if(len(args[4])>1):
+			for i in range(1, len(args[4])):
+				args_4+=args[4][i]
+		return f"{entity}{args[1]}{args[2]} {args[3]} {args_4}"
 	def guess(self, args):
 		self.count_guess+=1
-		return f"{args[0]} {args[1]}\n{args[2]}\n  {args[3]}{args[4]}\n"
-	def guess_statement(self, args):
-		return f"guess "+ self.print_stat(args)
+		return "guess "+self.print_stat(args)+"\n"
 	def guess_definition(self, args):
-		if not any(args[0]==t.value for t in guess[self.count_guess]):
+		if not(args[0] in entities.keys()):
 			raise ValueError(f"{args[0]} is not defined")
-		return self.print_stat(args)
+		if(args[0] in self.guess_entities):
+			raise ValueError(f"Entity already defined: {args[0]}")
+		self.guess_alias={}
+		self.guess_entities=set()
+		if(len(args)>2):
+			return f"\n  {args[0]}\n  {args[1]} {args[2]}"
+		return  f"\n  {args[0]}  {args[1]}"
 	def from_guess(self, args):
-		return "  from " + self.print_stat(args)
-	def guess_as(self, args):
-		return f"as {args[0]}"
+		return "from " + self.print_stat(args)
 	def guess_entity(self, args):
 		if(not args[0] in entities.keys()):
 			raise ValueError(f"Undefined entity: {args[0]}")
@@ -237,79 +205,32 @@ class CheckTransformer(Transformer):
 		return f"{args[0]}"
 	def guess_times(self, args):
 		return self.print_stat(args)
-	def inside_brackets(self, args):
-		return self.print_stat(args)
-	def value(self, args):
-		stat=f"{args[0]}"
-		name=True
-		if(len(args)>1):
-			stat=""
-			for i in range(len(args)):
-				stat+=f"{args[i]}"
-		else:
-			if(args[0].type!="NAME"):
-				name=False
-		if(name and not args[0] in guess[self.count_guess]):
+	def where_guess(self, args):
+		return "\n  where "+ self.print_stat(args)
+	def where_guess_statement(self, args):
+		if(not args[0] in guess[self.count_guess]):
 			raise ValueError(f"{args[0]} is not defined")
-		return stat
-	def condition(self, args):
-		return self.print_stat(args)
+		return f"{args[0]}{args[1]}{args[2]} {args[3]} {args[4]}"
+	def guess_from(self, args):
+		return "from " + self.print_stat(args)
+	def entity_guess(self, args):
+		if(not args[0] in entities.keys()):
+			raise ValueError(f"Undefined entity: {args[0]}")
+		if(len(args)>1):
+			self.guess_alias[args[1]]=args[0]
+			return f"{args[0]} as {args[1]}"
+		self.guess_entities.add(args[0])
+		return f"{args[0]}"
+	def guess_where(self, args):
+		return "\n  where "+ self.print_stat(args)
+	def guess_where_statement(self, args):
+		if(not (args[0] in guess[self.count_guess] or args[0] in self.guess_alias.keys() or args[0] in self.guess_entities)):
+			raise ValueError(f"{args[0]} is not defined")
+		return f"{args[0]}{args[1]}{args[2]} {args[3]} {args[4]}"
 	def operator(self, args):
 		return self.print_stat(args)
-	def bool_operator(self, args):
-		return self.print_stat(args)
-	def in_stat(self,args):
-		return self.print_stat(args)
-	def with_guess(self, args):
-		return f"with"+ self.print_stat(args)
-	def brackets(self, args):
-		statements=""
-		for i in range(len(args)):
-			if(args[i]!="(" and args[i]!=")"):
-				statements+=" "+args[i]
-		return "(" + statements + " )"
-	def with_statement(self, args):
-		statements=""
-		open_bracket=False
-		en=""
-		for i in range(len(args)):
-			statements+=f" {args[i]}"
-			if(open_bracket):
-				open_bracket=False
-				if not any(args[i]==t.value for t in self.with_attributes):
-					raise ValueError(f"{args[i]} is not an attribute of {en}")
-			if(args[i]=="("):
-				open_bracket=True
-				self.with_attributes=[]
-				en=args[i-1]
-				if(not args[i-1] in entities.keys()):
-					raise ValueError(f"{args[i-1]} is not defined")
-				else:
-					self.with_attributes=entities[args[i-1]]
-			if(args[i]=="," or args[i]=="("):
-				open_bracket=True
-				token=args[i+3]
-				if(token[0].type=="NAME"):
-					if(not (token[0].value in guess[self.count_guess])):
-						raise ValueError(f"{token[0].value} is not defined")
-				temp=args[i+3]
-				args[i+3]=""
-				for t in temp:
-					args[i+3]+=t.value
-				continue			
-		return statements
-	def where_guess(self, args):
-		statements=""
-		for i in range(len(args)):
-			if(args[i]!=","):
-				statements+=args[i]
-				if(not args[i] in guess[self.count_guess]):
-					raise ValueError(f"{args[i]} is not defined")
-			else:
-				statements+=", "
-		return f"where {statements}"
 	def times(self, args):
-		return args[0]
+		return "\n  "+ args[0]
 	def print_stat(self, args):
 		statements=f"{args[0]}"
 		for i in range(1, len(args)):
@@ -322,7 +243,7 @@ class CheckTransformer(Transformer):
 
 if __name__ == '__main__':
 	code=""
-	with open('examples/example1.txt', 'r') as file:
+	with open('examples/example3.txt', 'r') as file:
 	    code = file.read()
 	try:
 		parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())

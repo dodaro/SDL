@@ -1,30 +1,32 @@
-@entity resolution: value: int;
-@entity video: type: str;
-@entity f: video: video, resolution: resolution, bit_rate: bit_rate, sat_value: sat;
-@entity bit_rate: value: int;
-@entity sat: value: int;
-@entity assign: bit_rate: bit_rate, sat_value: sat;
+@entity Resolution: value: int;
+@entity Video: type: str;
+@entity F: video: Video, resolution: Resolution, bit_rate: Bit_rate, sat_value: Sat;
+@entity Bit_rate: value: int;
+@entity Sat: value: int;
+@entity Assign: bit_rate: Bit_rate, sat_value: Sat;
 
 
-define f
-	from video as v, sat
-		where f.video=v and sat_value=sat;
+define F
+	from Video as v, Sat
+		where F.video=v and F.sat_value=Sat;
 
-define assign as a
-	from bit_rate as b, sat as s
-		where a.sat_value=s and b=a.bit_rate;
+define Assign as a
+	from Bit_rate as b, Sat as s
+		where a.sat_value=s and a.bit_rate=b;
 
-define sat
-	from assign as a, sat as s2
-		where a=s2;
+define Sat
+	from Assign as a, Sat as s2
+		where a.sat_value=s2;
 
-@entity bandwidth: value: int;
+@entity Bandwidth: value: int;
 
-guess exactly 1 a: (video, r) with bit_rate(value=1) as b, assign(bit_rate=b, sat_value=s) as a, sat(value=2) as s
-	from video, resolution as r
-		where r;
-
-
-
-
-
+guess from F, Resolution as r
+	where F.resolution=r and r.int<=3
+		exactly 1
+			Bit_rate
+				where Bit_rate.value=1
+			Assign	
+				from Sat as s, Bit_rate as b
+					where Assign.bit_rate=b and Assign.sat_value=s
+			Sat 
+				where Sat.value=2;

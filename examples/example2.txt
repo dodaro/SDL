@@ -1,17 +1,18 @@
-@entity clause: id: int;
-@entity vars: id: int;
-@entity in_clause: clause: int, literal: int;
-@entity assignment: variable: vars;
+@entity Clause: id: int;
+@entity Vars: id: int;
+@entity In_clause: clause: int, literal: int;
+@entity Assignment: variable: Vars;
 
-guess at least 1 and at most 2 a with assignment(variable=v) as a 
-	from vars as v
-		where v, a;
+guess from Vars as v
+	at least 1 and at most 2
+		Assignment 
+			where Assignment.variable=v;
 
-define assignment as a
-	from vars as v, clause, vars as v2
-		where v.id=id and id=1;
+define Assignment as a
+	from Vars as v, Clause, Vars as v2
+		where v.id=id and Clause.id=1;
 
-define in_clause
-	from clause as c
-		where id=2 and clause=c.id;
+define In_clause
+	from Clause as c
+		where c.id=2 and In_clause.clause=c;
 
