@@ -24,4 +24,4 @@ guess from Node as n
 
 define Node as n
 	from Assign as a 
-		where a.node=n.value and n.value>1;
+		where a.node=n and n.value>1;

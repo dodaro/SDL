@@ -8,25 +8,34 @@
 
 define F
 	from Video as v, Sat
-		where F.video=v and F.sat_value=Sat;
+		where F.video.type=F.video.type and F.sat_value.value=1;
 
 define Assign as a
 	from Bit_rate as b, Sat as s
-		where a.sat_value=s and a.bit_rate=b;
+		where a.sat_value.value=s.value and a.bit_rate.value=b.value;
 
 define Sat
 	from Assign as a, Sat as s2
-		where a.sat_value=s2;
+		where a.sat_value.value=s2.value;
 
 @entity Bandwidth: value: int;
 
 guess from F, Resolution as r
-	where F.resolution=r and r.int<=3
-		exactly 1
-			Bit_rate
-				where Bit_rate.value=1
-			Assign	
+	where F.resolution.value=Assign.sat_value.value and r.value<=4
+		at_most 1 and at_least F.resolution.value
+			Bit_rate as b2
+				where b2.value=F.resolution.value
+			Assign
 				from Sat as s, Bit_rate as b
-					where Assign.bit_rate=b and Assign.sat_value=s
-			Sat 
-				where Sat.value=2;
+					where Assign.bit_rate=b and Assign.sat_value=s and b.value=s1.value and b.value=1
+			Sat as s1
+				from Assign as a3, Sat
+					where a3.sat_value.value=2;
+
+deny from Assign as a
+	where a.sat_value.value=1;
+
+assert F as f from Resolution, Sat as s1
+	where s1.value=f.resolution.value;
+
+

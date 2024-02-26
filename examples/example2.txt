@@ -1,18 +1,24 @@
+@entity In_clause: clause: Clause, literal: int;
 @entity Clause: id: int;
-@entity Vars: id: int;
-@entity In_clause: clause: int, literal: int;
 @entity Assignment: variable: Vars;
 
 guess from Vars as v
-	at least 1 and at most 2
+	at_least 1 and at_most 2
 		Assignment 
 			where Assignment.variable=v;
 
 define Assignment as a
 	from Vars as v, Clause, Vars as v2
-		where v.id=id and Clause.id=1;
+		where v.id=Clause.id and Clause.id=1;
 
 define In_clause
 	from Clause as c
 		where c.id=2 and In_clause.clause=c;
 
+@entity Vars: id: int;
+
+deny from Clause as c
+	where c.id=1;
+
+assert Assignment as a from In_clause, Clause as c
+	where c.id=In_clause.clause.id and a.variable.id<In_clause.clause.id;
