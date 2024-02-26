@@ -25,3 +25,7 @@ guess from Node as n
 define Node as n
 	from Assign as a 
 		where a.node=n and n.value>1;
+
+assert Node as n
+	from Assign as a
+		where a.node.value=n.value and a.color.value="green";

@@ -315,6 +315,7 @@ class CheckTransformer(Transformer):
 		else:
 			args[0]=self.defined_entity
 		attribute=self.attributes_check(args)
+		args[0]=entity
 		for i in range(len(args)):
 			statement+=f"{args[i]}"
 		return statement + "/" + attribute
@@ -395,7 +396,7 @@ class CheckTransformer(Transformer):
 		attribute=self.attributes_check(args)
 		statement=", "
 		types=args[-1].split("/")
-		if(not types[1]==attribute):
+		if(not types[1]==attribute and attribute!="any"):
 			raise ValueError(f"{types[1]} cannot be assigned to type {attribute}")
 		args[-1]=types[0]
 		if(args[0] in self.new_define_alias.keys()):
@@ -510,7 +511,7 @@ class CheckTransformer(Transformer):
 		statement=""
 		attribute=self.attributes_guess_check(args)
 		types=args[-1].split("/")
-		if(not types[1]==attribute):
+		if(not types[1]==attribute and attribute!="any"):
 			raise ValueError(f"{types[1]} cannot be assigned to type {attribute}")
 		args[-1]=types[0]
 		if(args[0] in self.new_guess_alias.keys()):
@@ -551,7 +552,7 @@ class CheckTransformer(Transformer):
 			raise ValueError(f"{args[0]} is not defined")
 		attribute=self.attributes_guess_check(args)
 		types=args[-1].split("/")
-		if(not types[1]==attribute):
+		if(not types[1]==attribute and attribute!="any"):
 			raise ValueError(f"{types[1]} cannot be assigned to type {attribute}")
 		args[-1]=types[0]
 		if(args[0] in self.new_guess_alias.keys()):
@@ -621,7 +622,7 @@ class CheckTransformer(Transformer):
 			args[0]=self.defined_entity
 		attribute=self.attributes_check(args)
 		types=args[-1].split("/")
-		if(not types[1]==attribute):
+		if(not types[1]==attribute and attribute!="any"):
 			raise ValueError(f"{types[1]} cannot be assigned to type {attribute}")
 		args[-1]=types[0]
 		return self.print_stat(args)
@@ -734,7 +735,7 @@ if __name__ == '__main__':
 	(options, args) = parser.parse_args()
 	code=""	
 	for line in fileinput.input(args):
-		code += line
+		code += line		
 	try:
 		parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())
 		parser_entities.parse(code)
