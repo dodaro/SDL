@@ -186,17 +186,17 @@ class CheckTransformer(Transformer):
 		ordered.append("from pyspell.L import *\n\n")
 		while len(ordered) - 1 < len(atoms):
 			for atom in atoms:
-				if atom not in ordered:
+				if not atom in ordered:
 					name = atom.split("class ")[1].split(":")[0]
 					if not self.dependencies[name]:
 						ordered.append(atom)
 						ordered_atoms.append(name)
-				else:
-					all_dependencies_met = all(dep in ordered_atoms for dep in self.dependencies[name])
-					if all_dependencies_met:
-						ordered.append(atom)
-						ordered_atoms.append(name)
-		ordered.append(f"\nproblem{self.problem} += Problem()\n\n")
+					else:
+						all_dependencies_met = all(dep in ordered_atoms for dep in self.dependencies[name])
+						if all_dependencies_met:
+							ordered.append(atom)
+							ordered_atoms.append(name)
+		ordered.append(f"\nproblem{self.problem} = Problem()\n\n")
 		ordered.extend(others)
 		return "".join(ordered)	
 	def entity(self, args):	
