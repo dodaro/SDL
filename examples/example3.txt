@@ -3,39 +3,59 @@
 @entity F: video: Video, resolution: Resolution, bit_rate: Bit_rate, sat_value: Sat;
 @entity Bit_rate: value: int;
 @entity Sat: value: int;
-@entity Assign: bit_rate: Bit_rate, sat_value: Sat;
+@entity User: id: int, video: Video, resolution: Resolution, max_sat: Sat, max_bit: Bit_rate;
+@entity MaxRepresentation: value: int;
+@entity R: video: Video, resolution: Resolution, bit_rate: Bit_rate, sat_value: Sat;
+@entity GlobalCapacity: value: int;
+@entity Assign: user:User, bit_rate: Bit_rate, sat_value: Sat;
+@entity FractionUser: value: int;
 
 
-define F
-	from Video as v, Sat
-		where F.video.type=F.video.type and F.sat_value.value=1;
+guess from MaxRepresentation as m
+	where m.value=2
+		exactly m.value
+			R as r
+				from F as f, User as user
+					where r.bit_rate.value<=user.max_bit.value and user.video=r.video and user.resolution=r.resolution and f.video=r.video and f.resolution=r.resolution and f.bit_rate=r.bit_rate and f.sat_value=r.sat_value;
 
-define Assign as a
-	from Bit_rate as b, Sat as s
-		where a.sat_value.value=s.value and a.bit_rate.value=b.value;
+guess from User as user, Bit_rate as n
+	where user.max_bit=n and user.max_bit.value=2
+		Assign as a
+			from F as f
+				where f.bit_rate.value<=user.max_bit.value and f.video=user.video and f.resolution=user.resolution and a.user=user and a.bit_rate=f.bit_rate and a.sat_value=f.sat_value;
+
 
 define Sat
-	from Assign as a, Sat as s2
-		where a.sat_value.value=s2.value;
+	from F as f
+		where Sat.value=2 and f.sat_value=Sat;
+
+define Bit_rate as b
+	from Assign as a, Sat as s
+		where a.sat_value.value=s.value and a.bit_rate=b;
+
+define Sat
+	from Assign as a
+		where a.sat_value.value=Sat.value;
+
+deny from User as user, Assign as a, Resolution as r, Video as v, Bit_rate as b, Sat as s
+	where user.resolution=r and user.video=v and user.max_bit=b and user.max_sat=s and a.user=user;
 
 @entity Bandwidth: value: int;
 
 guess from F, Resolution as r
-	where F.resolution.value=Assign.sat_value.value and r.value<=4
+	where F.resolution.value==1 and F.resolution=r and r.value<=4
 		at_most 1 and at_least F.resolution.value
 			Bit_rate as b2
 				where b2.value=F.resolution.value
-			Assign
-				from Sat as s, Bit_rate as b
-					where Assign.bit_rate=b and Assign.sat_value=s and b.value=s1.value and b.value=1
-			Sat as s1
-				from Assign as a3, Sat
-					where a3.sat_value.value=2;
+			Sat
+				from Assign as a3, Bit_rate
+					where a3.sat_value=Sat and a3.sat_value.value=2;
 
-deny from Assign as a
-	where a.sat_value.value=1;
 
-assert F as f from Resolution, Sat as s1
-	where s1.value=f.resolution.value;
+deny from Assign as a, Sat as s
+	where a.sat_value.value=1 and a.sat_value=s;
+
+assert R as r from Assign as a 
+	where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
 
 

@@ -3,6 +3,13 @@
 @entity Edge: node1: Node, node2: Node;
 @entity Assign: node: Node, color: Color;
 
+
+guess from Node as n
+	exactly 1 
+		Assign
+			from Color as c
+				where Assign.node=n and Assign.color=c;
+
 define Node as n
     from Edge, Edge as e2
 	where Edge.node1=n and e2.node1=n;
@@ -13,14 +20,11 @@ define Color as c
 
 
 guess from Node as n
-	where n.value > 1 and n.value=6
+	where n.value=6
 		exactly 1 
 			Assign
 				from Color as c
-					where Assign.node=n and Assign.color=c
-			Edge
-				from Color as c
-					where Edge.node1=n;
+					where Assign.node=n and Assign.color=c and c.value="green";
 
 define Node as n
 	from Assign as a 
@@ -29,3 +33,6 @@ define Node as n
 assert Node as n
 	from Assign as a
 		where a.node.value=n.value and a.color.value="green";
+
+deny from Node as n, Edge as e, Node as n2
+	where e.node1=n and e.node2=n2;
