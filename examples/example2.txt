@@ -34,3 +34,22 @@ define WeightedClause as w
 define Assignment 
 	from Vars as v
 		where v.id==3 and Assignment.variable=v;
+
+try deny from Vars as v, Assignment as a
+		where a.variable=v and v.id<2
+otherwise
+	pay v.id
+	at level 4;
+
+
+
+try assert Clause from In_clause as i
+	where i.clause=Clause.id
+otherwise
+	pay Clause.id
+	at level 1;
+
+recursive define In_clause
+	from WeightedClause as w, In_clause as i
+		where In_clause.clause=w.clause and w.literal=i.literal and i.literal=In_clause.literal;
+

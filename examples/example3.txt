@@ -18,7 +18,7 @@ guess from MaxRepresentation as m
 				from F as f, User as user
 					where r.bit_rate.value<=user.max_bit.value and user.video=r.video and user.resolution=r.resolution and f.video=r.video and f.resolution=r.resolution and f.bit_rate=r.bit_rate and f.sat_value=r.sat_value;
 
-guess from User as user, Bit_rate as n
+guess from User as user, Bit_rate as n, Video as v
 	where user.max_bit=n and user.max_bit.value=2
 		Assign as a
 			from F as f
@@ -34,8 +34,8 @@ define Bit_rate as b
 		where a.sat_value.value=s.value and a.bit_rate=b;
 
 define Sat
-	from Assign as a
-		where a.sat_value.value=Sat.value;
+	from Assign as a, Video as v
+		where a.sat_value.value=Sat.value and a.user.video=v;
 
 deny from User as user, Assign as a, Resolution as r, Video as v, Bit_rate as b, Sat as s
 	where user.resolution=r and user.video=v and user.max_bit=b and user.max_sat=s and a.user=user;
@@ -51,7 +51,6 @@ guess from F, Resolution as r
 				from Assign as a3, Bit_rate
 					where a3.sat_value=Sat and a3.sat_value.value=2;
 
-
 deny from Assign as a, Sat as s
 	where a.sat_value.value=1 and a.sat_value=s;
 
@@ -59,3 +58,14 @@ assert R as r from Assign as a
 	where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
 
 
+try assert Bit_rate as b from Sat as s
+	where b.value=s.value
+otherwise
+	pay b.value
+	at level s.value;
+
+try deny from Sat
+	where Sat.value=2
+otherwise
+	pay 1
+	at level 3;

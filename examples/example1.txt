@@ -36,3 +36,21 @@ assert Node as n
 
 deny from Node as n, Edge as e, Node as n2
 	where e.node1=n and e.node2=n2;
+
+
+try assert Node as n
+	from Assign as a
+		where a.node.value=n.value and a.color.value="green"
+otherwise
+	pay a.node.value
+	at level n.value-1;
+
+try deny from Edge as e, Node as n
+	where e.node1=n
+otherwise
+	pay 2
+	at level n.value;
+
+recursive define Edge
+		from Edge as e2, Assign as a
+			where e2.node1=Edge.node1 and a.node=e2.node2 and Edge.node2=a.node;
