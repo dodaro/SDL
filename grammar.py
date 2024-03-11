@@ -1,7 +1,10 @@
-from lark import Lark, Transformer, exceptions, Token
-from optparse import OptionParser
 import fileinput
-import re, random, subprocess
+import random
+import re
+import subprocess
+from optparse import OptionParser
+
+from lark import Lark, Transformer, exceptions, Token, ParseTree
 
 entities = {} #dizionario con chiave nome dell'entità e valore la lista dei parametri e rispettivi tipi
 guess={} #dizionario di alias ed entità del primo from del guess
@@ -1053,38 +1056,41 @@ class CheckTransformer(Transformer):
 		self.guess_count+=1
 		return args
 
-if __name__ == '__main__':
+
+def build_tree(code: str) -> ParseTree:
+	parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())
+	parser_entities.parse(code)
+	parser_check = Lark(grammar, parser='lalr', transformer=CheckTransformer())
+	return parser_check.parse(code)
+
+
+def main():
 	destination_file = "o.py"
-	parser = OptionParser(usage = "Usage: %prog [options] [input_files]")
+	parser = OptionParser(usage="Usage: %prog [options] [input_files]")
 	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
 	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
 	parser.add_option("-e", "--execute", dest="execute", help="execute the generated code")
 	(options, args) = parser.parse_args()
-	code=""	
-	for line in fileinput.input(args):
-		code += line		
+	code = ''.join(fileinput.input(args))
 	try:
-		parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())
-		parser_entities.parse(code)
-		parser_check = Lark(grammar, parser='lalr', transformer=CheckTransformer())
-		tree=parser_check.parse(code)		
+		tree = build_tree(code)
 		if options.verbose:
 			print(tree)
 		if options.destination_file is not None:
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
-		f.write(tree)
+		f.write(str(tree))
 		if options.execute is not None:
-			execution_string=f"""
+			execution_string = f"""
 solver = SolverWrapper(solver_path="{options.execute}")
 res = solver.solve(problem=problem{number}, timeout=10)
 if res.status == Result.HAS_SOLUTION:
-    print("Has solution")
+	print("Has solution")
 elif res.status == Result.NO_SOLUTION:
-    print("No solution found!")
+	print("No solution found!")
 else:
-    print("Unknown")
-"""			
+	print("Unknown")
+	"""
 			f.write(execution_string)
 			f.close()
 			subprocess.run(["python", f"{destination_file}"])
@@ -1094,4 +1100,7 @@ else:
 		print(f"Parsing error: {e}")
 	except Exception as e:
 		print(f"Unexpected error: {e}")
-	
+
+
+if __name__ == '__main__':
+	main()
