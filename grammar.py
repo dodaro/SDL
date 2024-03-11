@@ -207,7 +207,7 @@ class CheckTransformer(Transformer):
 		others=[other for other in args if other not in atoms]
 		ordered_atoms = []
 		ordered=[]
-		ordered.append("from pyspell.L import *\n\n")
+		ordered.append("from pyspel.pyspel import *\n\n")
 		length=len(ordered)
 		while len(ordered) - 1 < len(atoms):
 			for atom in atoms:
@@ -1054,10 +1054,11 @@ class CheckTransformer(Transformer):
 		return args
 
 if __name__ == '__main__':
+	destination_file = "o.py"
 	parser = OptionParser(usage = "Usage: %prog [options] [input_files]")
 	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
 	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
-	parser.add_option("-e", "--execute", action="store_true", default=False, dest="execute", help="Execute the generated code")
+	parser.add_option("-e", "--execute", dest="execute", help="execute the generated code")
 	(options, args) = parser.parse_args()
 	code=""	
 	for line in fileinput.input(args):
@@ -1069,20 +1070,26 @@ if __name__ == '__main__':
 		tree=parser_check.parse(code)		
 		if options.verbose:
 			print(tree)
-		if options.execute:
-			stringa=f"""
-	solver = SolverWrapper(solver_path="/home/osboxes/miniconda3/envs/potassco/bin/clingo")
-	res = solver.solve(problem=problem{number}, timeout=10)
-	if res.status == Result.HAS_SOLUTION:
-	    print("has solution")
-	elif res.status == Result.NO_SOLUTION:
-	    print("No solution found!")
-	else:
-	    print("Unknown")
-"""
-			with open("o.py", "w") as file:
-				file.write(tree+stringa)
-			subprocess.run(["python", "o.py"])
+		if options.destination_file is not None:
+			destination_file = options.destination_file
+		f = open(f"{destination_file}", "w")
+		f.write(tree)
+		if options.execute is not None:
+			execution_string=f"""
+solver = SolverWrapper(solver_path="{options.execute}")
+res = solver.solve(problem=problem{number}, timeout=10)
+if res.status == Result.HAS_SOLUTION:
+    print("Has solution")
+elif res.status == Result.NO_SOLUTION:
+    print("No solution found!")
+else:
+    print("Unknown")
+"""			
+			f.write(execution_string)
+			f.close()
+			subprocess.run(["python", f"{destination_file}"])
+		else:
+			f.close()
 	except exceptions.LarkError as e:
 		print(f"Parsing error: {e}")
 	except Exception as e:
