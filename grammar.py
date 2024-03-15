@@ -44,7 +44,8 @@ grammar = """
 	assert_: assert_statement SEMICOLON
 	deny_: deny SEMICOLON
 	assert_statement: assert_definition assert_from? where_assert
-	assert_definition: "assert" (ENTITY_NAME ("as" NAME)?)?
+	assert_definition: "deny unless" assert_entities (OR assert_entities)*
+	assert_entities: ENTITY_NAME ("as" NAME)?
 	assert_from: "from" assert_entity (COMMA assert_entity)*
 	assert_entity: ENTITY_NAME ("as" NAME)?
 	where_assert: "where" where_assert_statement (AND where_assert_statement)*
@@ -54,10 +55,10 @@ grammar = """
 	deny_entity: ENTITY_NAME ("as" NAME)?
 	where_deny: "where" where_deny_statement (AND where_deny_statement)*
 	where_deny_statement: (NAME | ENTITY_NAME) (DOT NAME)+ (operator | ASSIGN) var
-	try_assert: "try" assert_otherwise "otherwise" otherwise SEMICOLON
+	try_assert: assert_otherwise "or" pay_statement SEMICOLON
 	assert_otherwise: assert_definition assert_from? where_assert
-	otherwise: "pay" (INT | pay | arithmetic_operation) "at level" (INT | pay | arithmetic_operation)
-	try_deny: "try" deny_otherwise "otherwise" otherwise SEMICOLON
+	pay_statement: "pay" (INT | pay | arithmetic_operation) "at" (INT | pay | arithmetic_operation)
+	try_deny: deny_otherwise "or" pay_statement SEMICOLON
 	deny_otherwise: "deny" deny_from? where_deny
 	pay: (NAME | ENTITY_NAME) (DOT NAME)+
 	arithmetic_operation: (pay | INT) (SUM | MINUS) (pay | INT)
@@ -73,7 +74,8 @@ grammar = """
 	operator: EQUALITY | LT | LE | GT | GE | NOTEQUAL
 	bool_operator: AND | OR
 	times: EXACTLY | ATLEAST | ATMOST
-	attr_type: ANY | STRING | INTEGER | ENTITY_NAME
+	attr_type: ANY | STRING | INTEGER | ENTITY_NAME | REGEX
+	REGEX: "r"/"[^"]+"/
 	NAME: /[a-z_][a-z0-9_]*/
 	ENTITY_NAME: /[A-Z][a-zA-Z0-9_]*/
 	COLON: ":"
@@ -158,7 +160,7 @@ class DeclarationTransformer(Transformer):
 				raise ValueError(f"Entity already defined: {args[0]}")
 			guess_entities[self.count_guess][args[0]]=args[0]
 			guess[self.count_guess].append(args[0])
-	def entity_guess(self, args): #da togliere??
+	def entity_guess(self, args):
 		if(len(args)>1):
 			if(args[1] in guess_entities[self.count_guess].keys()):
 				raise ValueError(f"Alias already defined: {args[1]}")
@@ -181,8 +183,8 @@ class CheckTransformer(Transformer):
 		self.declared_alias={} #dizionario degli alias dichiarati nel from di ogni define e con valore l'entità
 		self.defined_entities=set() #entità definite nel from di ogni define
 		self.attributes={} #dizionario con chiave l'entità/l'alias e valore la lista degli attributi, inizializzato ad ogni define
-		self.defined_entity="" #entità definita nella define
-		self.redefined_entity="" #alias dell'entità definita nella define
+		self.defined_entity=set() #entità definita nella define
+		self.redefined_entity={} #alias dell'entità definita nella define
 		self.new_define_alias={} #nuovi alias del costrutto define con chiave l'alias/entità
 		self.new_guess_alias={} #nuovi alias del costrutto guess con chiave l'alias/entità
 		self.guess_alias={} #alias del costrutto guess
@@ -277,8 +279,6 @@ class CheckTransformer(Transformer):
 		for i in range(len(args)):
 			if(not args[i]==";" and not args[i]=="and"):
 				statements+=f"{args[i]}"
-		if(self.redefined_entity==""):
-			return statements + f").define({self.new_define_alias[self.defined_entity]})\n"
 		for alias in self.new_define_alias.keys():
 			return statements + f").define({self.new_define_alias[alias]})\n"
 	def define_definition(self, args):
@@ -287,33 +287,33 @@ class CheckTransformer(Transformer):
 		if(not args[0] in entities.keys()):
 			 raise ValueError(f"Undefined entity: {args[0]}")
 		self.attributes={}
-		self.defined_entity=args[0]
 		attr=entities[args[0]]
 		all_attr=[]
 		for i in range(len(attr)):
 			all_attr.append(attr[i]) 
-		self.attributes[self.defined_entity]=all_attr
+		self.attributes[args[0]]=all_attr
 		if(len(args)>1):
+			self.redefined_entity[args[1]]=args[0]
 			alias=self.add_number(args[1])
 			self.new_define_alias[args[1]]=alias
 			return f"{args[0]}() as {alias}"
+		self.defined_entity.add(args[0])
 		alias=self.number(args[0])
 		self.new_define_alias[args[0].value]=alias
 		return f"{args[0]}() as {alias}"
 	def as_statement(self, args):
-		self.redefined_entity=args[0]
 		return f"{args[0]}"
 	def define_entity(self, args):
 		if(not args[0] in entities.keys()):
 			raise ValueError(f"Undefined entity: {args[0]}")
 		var=""
 		if(len(args)>1): #se è stato definito l'alias aggiungo in declared_alias altrimenti in defined_entities
-			if(args[1] in self.declared_alias or args[1]==self.redefined_entity):
+			if(args[1] in self.declared_alias or args[1] in self.redefined_entity.keys()):
 				raise ValueError(f"Alias already defined: {args[1]}")
 			self.declared_alias[args[1]]=args[0]
 			var=args[1]
 		else:
-			if(args[0] in self.defined_entities or args[0]==self.defined_entity):
+			if(args[0] in self.defined_entities or args[0] in self.defined_entity):
 				raise ValueError(f"Entity already defined: {args[0]}")
 			self.defined_entities.add(args[0])
 			var=args[0]
@@ -336,16 +336,12 @@ class CheckTransformer(Transformer):
 	def value(self, args):
 		statement=""
 		entity=args[0]
-		if(not (args[0]==self.redefined_entity or (self.redefined_entity=="" and args[0]==self.defined_entity))):
+		if(not (args[0] in self.defined_entity or args[0] in self.redefined_entity.keys())):
 			if(not args[0] in self.declared_alias.keys()and not args[0] in self.defined_entities):
-					raise ValueError(f"{args[0]} is not dddefined")
-		else:
-			args[0]=self.defined_entity
+					raise ValueError(f"{args[0]} is not dsefined")
 		attribute=self.attributes_check(args)
 		if(args[0] in self.new_define_alias.keys()):
 			args[0]=self.new_define_alias[args[0]]
-		if(args[0]==self.defined_entity and self.redefined_entity!=""): #nel caso in cui ci sia l'alias dell'entità della define
-			args[0]=self.new_define_alias[entity]
 		for i in range(len(args)):
 			statement+=f"{args[i]}"
 		return statement + "/" + attribute
@@ -356,16 +352,12 @@ class CheckTransformer(Transformer):
 	def value_define(self, args):
 		statement=""
 		entity=args[0]
-		if(not (args[0]==self.redefined_entity or (self.redefined_entity=="" and args[0]==self.defined_entity))):
+		if(not (args[0] in self.redefined_entity.keys() or args[0] in self.defined_entity)):
 			if(not args[0] in self.declared_alias.keys()and not args[0] in self.defined_entities):
-					raise ValueError(f"{args[0]} is not defined")
-		else:
-			args[0]=self.defined_entity
+					raise ValueError(f"{args[0]} is not defsined")
 		attribute=self.attributes_check(args)
 		if(args[0] in self.new_define_alias.keys()):
 			args[0]=self.new_define_alias[args[0]]
-		if(args[0]==self.defined_entity and self.redefined_entity!=""): #nel caso in cui ci sia l'alias dell'entità della define
-			args[0]=self.new_define_alias[entity]
 		for i in range(len(args)):
 			statement+=f"{args[i]}"
 		return statement + "/" + attribute
@@ -411,11 +403,9 @@ class CheckTransformer(Transformer):
 		return self.value_guess_check(args)
 	def where_define_statement(self, args):
 		entity=args[0]
-		if(not (args[0]==self.redefined_entity or (self.redefined_entity=="" and args[0]==self.defined_entity))):
-			if(not args[0] in self.declared_alias.keys()and not args[0] in self.defined_entities):
-					raise ValueError(f"{args[0]} is not defined")
-		else:
-			args[0]=self.defined_entity
+		if(not (args[0] in self.redefined_entity.keys() or args[0] in self.defined_entity)):
+			if(not args[0] in self.declared_alias.keys() and not args[0] in self.defined_entities):
+					raise ValueError(f"{args[0]} is not sdefined")
 		attribute=self.attributes_check(args)
 		statement=", "
 		types=args[-1].split("/")
@@ -424,8 +414,6 @@ class CheckTransformer(Transformer):
 		args[-1]=types[0]
 		if(args[0] in self.new_define_alias.keys()):
 			args[0]=self.new_define_alias[args[0]]
-		if(args[0]==self.defined_entity and self.redefined_entity!=""): #nel caso in cui ci sia l'alias dell'entità della define
-			args[0]=self.new_define_alias[entity]
 		if(args[-2]!="=" and (attribute!="str" and attribute!="int" and attribute!="any")):
 			raise TypeError(f"Cannot compare objects of these types: {attribute}")
 		if(attribute!="any" and attribute!="int" and attribute!="str"):	
@@ -879,16 +867,18 @@ class CheckTransformer(Transformer):
 		self.statement=self.statement[:-2]
 		self.define_condition=[]	
 	def init_define_variables(self):
-		self.redefined_entity=""
-		self.defined_entity=""
+		self.redefined_entity={}
+		self.defined_entity=set()
 		self.new_define_alias={}
 		self.declared_alias={}
 		self.defined_entities=set()
 		self.attributes={}
 		self.count=0
 	def assert_definition(self, args):
+		return self.print_stat(args)
+	def assert_entities(self,args):
 		if(len(args)>1):
-			self.redefined_entity=args[1]
+			self.redefined_entity[args[1]]=args[0]
 		return self.define_definition(args)
 	def assert_from(self, args):
 		return self.print_stat(args)
@@ -901,22 +891,25 @@ class CheckTransformer(Transformer):
 				args[i]=""
 			if(args[i]!=""):
 				statement+=args[i]
-		var=""
-		if(self.redefined_entity==""):
-			var=self.defined_entity
-		else:
-			var=self.redefined_entity
+		var=[]
+		for alias in self.redefined_entity.keys():
+			var.append(self.new_define_alias[alias])
+		for entity in self.defined_entity:
+			var.append(self.new_define_alias[entity])
 		pre_statement=""
 		for alias in self.new_define_alias.values():
-			if(alias != self.new_define_alias[var]):
+			if(not alias in var):
 				pre_statement+=alias+", "
+		var_statement=f"{var[0]}"
+		for i in range(1, len(var)):
+			var_statement+=f", {var[i]}"
 		if(len(statement)>1):
 			if(statement[-2]==","):
 				statement=statement[:-2]
-			return "Assert("+self.new_define_alias[var]+").when("+pre_statement+statement[2:]+")"
+			return "Assert("+var_statement+").when("+pre_statement+statement[2:]+")"
 		if(pre_statement!=""):
 			pre_statement=pre_statement[:-2]
-		return "Assert("+self.new_define_alias[var]+").when("+pre_statement+")"
+		return "Assert("+var_statement+").when("+pre_statement+")"
 	def where_assert_statement(self, args):
 		return self.where_define_statement(args)
 	def try_assert(self, args):
@@ -927,7 +920,7 @@ class CheckTransformer(Transformer):
 		if(len(args)>2):
 			return f"with {self.statement}:\n	problem{self.problem}+={args[2]}"
 		return f"with {self.statement}:\n	problem{self.problem}+={args[1]}"
-	def otherwise(self, args):
+	def pay_statement(self, args):
 		return args[0]+","+args[1]+",0"
 	def try_deny(self, args):
 		self.init_define_variables()
@@ -992,7 +985,10 @@ class CheckTransformer(Transformer):
 			if(args[0].type=="ENTITY_NAME"):
 				attribute=args[0]
 			if(args[0].type=="NAME"):
-				attribute=self.declared_alias[args[0]]
+				if(args[0] in self.declared_alias.keys()):
+					attribute=self.declared_alias[args[0]]
+				else:
+					attribute=self.redefined_entity[args[0]]
 		if(len(args)>=2):	
 			for i in range(2, len(args), 2):
 				if(args[i-1]=="."):	
@@ -1055,7 +1051,6 @@ class CheckTransformer(Transformer):
 		args=args+"_"+f"{self.guess_count}"
 		self.guess_count+=1
 		return args
-
 
 def build_tree(code: str) -> ParseTree:
 	parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())

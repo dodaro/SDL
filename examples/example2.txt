@@ -22,34 +22,26 @@ define Vars as v
 deny from Clause as c
 	where c.id=1;
 
-assert Clause from WeightedClause as w
-	where w.clause=Clause.id;
+deny unless Clause 
+	from WeightedClause as w
+		where w.clause=Clause.id;
 
 define WeightedClause as w
 	from Clause as c, In_clause as i
 		where w.literal==i.literal and w.clause=c.id;
 
-
-
-define Assignment 
+define Assignment
 	from Vars as v
 		where v.id==3 and Assignment.variable=v;
 
-try deny from Vars as v, Assignment as a
-		where a.variable=v and v.id<2
-otherwise
-	pay v.id
-	at level 4;
+deny from Vars as v, Assignment as a
+	where a.variable=v and v.id<2
+		or pay v.id at 4;
 
 
 
-try assert Clause from In_clause as i
-	where i.clause=Clause.id
-otherwise
-	pay Clause.id
-	at level 1;
-
-recursive define In_clause
-	from WeightedClause as w, In_clause as i
-		where In_clause.clause=w.clause and w.literal=i.literal and i.literal=In_clause.literal;
+deny unless Clause or Assignment as a
+	from In_clause as i, WeightedClause as w
+		where i.clause=Clause.id and w.clause=a.variable.id
+			or pay Clause.id at 1;
 

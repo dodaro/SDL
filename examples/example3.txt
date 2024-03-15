@@ -54,18 +54,16 @@ guess from F, Resolution as r
 deny from Assign as a, Sat as s
 	where a.sat_value.value=1 and a.sat_value=s;
 
-assert R as r from Assign as a 
-	where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
+deny unless R as r 
+	from Assign as a 
+		where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
 
 
-try assert Bit_rate as b from Sat as s
-	where b.value=s.value
-otherwise
-	pay b.value
-	at level s.value;
+deny unless Bit_rate as b or Bandwidth as band
+	from Sat as s
+		where b.value=s.value and band.value=s.value
+			or pay b.value at s.value;
 
-try deny from Sat
+deny from Sat
 	where Sat.value=2
-otherwise
-	pay 1
-	at level 3;
+		or pay 1 at 3;
