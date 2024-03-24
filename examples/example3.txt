@@ -27,6 +27,7 @@ guess from User as user, Bit_rate as n, Video as v
 
 define Sat
 	from F as f
+		count of {f2.video from F as f2 where f2.video=f.video}>0
 		where Sat.value=2 and f.sat_value=Sat;
 
 define Bit_rate as b
@@ -54,8 +55,10 @@ guess from F, Resolution as r
 deny from Assign as a, Sat as s
 	where a.sat_value.value=1 and a.sat_value=s;
 
+
 deny unless R as r 
 	from Assign as a 
+		count of {r2 from R as r2 where r2.video.type=r.video.type}>2
 		where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
 
 

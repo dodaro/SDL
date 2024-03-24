@@ -5,14 +5,18 @@
 
 
 guess from Node as n
+	count of {a2.node from Assign as a2 where a2.node.value=1; e3 from Edge as e3 where e3.node1.value=n.value} == 7
+	where n.value=1
 	exactly 1 
 		Assign
 			from Color as c
-				where Assign.node=n and Assign.color=c;
+				where n=Assign.node and Assign.color=c;
 
 define Node as n
-    from Edge, Edge as e2
-	where Edge.node1=n and e2.node1=n;
+	from Assign as a
+	count of {a2.node from Assign as a2 where a2.node.value=1; e3 from Edge as e3 where e3.node1.value=n.value} == 7 and
+	sum of {a4.node from Assign as a4} ==1
+		where n.value==a.node.value;
 
 define Color as c
     from Assign, Node as n
@@ -42,7 +46,13 @@ deny from Edge as e, Node as n
 		or pay 2 at n.value;
 
 deny unless Node as n
-	from Edge as e
-		where e.node1=n
+		count of {a from Assign as a where a.node.value=n.value}>=2
+		where n.value=2
 			or pay 2 at n.value;
+
+recursive define Edge
+	from Edge as e2, Assign as a
+		where e2.node1=Edge.node1 and a.node=e2.node2 and Edge.node2=a.node;
+
+
 

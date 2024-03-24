@@ -9,6 +9,7 @@ guess from Vars as v
 		where Assignment.variable=v;
 
 guess from Vars as v
+	sum of {a.variable from Assignment as a where a.variable.id<5}> 2
 	at_least 1 and at_most 2
 		Assignment 
 			where Assignment.variable=v;
@@ -32,10 +33,11 @@ define WeightedClause as w
 
 define Assignment
 	from Vars as v
+		count of {v.id} == 1
 		where v.id==3 and Assignment.variable=v;
 
-deny from Vars as v, Assignment as a
-	where a.variable=v and v.id<2
+deny from Vars as v
+	sum of {v.id}==2
 		or pay v.id at 4;
 
 
@@ -44,4 +46,8 @@ deny unless Clause or Assignment as a
 	from In_clause as i, WeightedClause as w
 		where i.clause=Clause.id and w.clause=a.variable.id
 			or pay Clause.id at 1;
+
+recursive define In_clause
+	from WeightedClause as w, In_clause as i
+		where In_clause.clause=w.clause and w.literal=i.literal and i.literal=In_clause.literal;
 
