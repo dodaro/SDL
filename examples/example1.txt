@@ -14,8 +14,8 @@ guess from Node as n
 
 define Node as n
 	from Assign as a
-	count of {a2.node from Assign as a2 where a2.node.value=1; e3 from Edge as e3 where e3.node1.value=n.value} == 7 and
-	sum of {a4.node from Assign as a4} ==1
+	max of {a2.node.value from Assign as a2 where a2.node.value=1} >= n.value and
+	sum of {a4.node.value from Assign as a4} ==1
 		where n.value==a.node.value;
 
 define Color as c
@@ -50,9 +50,7 @@ deny unless Node as n
 		where n.value=2
 			or pay 2 at n.value;
 
-recursive define Edge
+define Edge
 	from Edge as e2, Assign as a
-		where e2.node1=Edge.node1 and a.node=e2.node2 and Edge.node2=a.node;
-
-
+		where e2.node1=Edge.node1 and Edge.node2=a.node;
 

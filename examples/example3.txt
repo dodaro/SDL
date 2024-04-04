@@ -58,7 +58,7 @@ deny from Assign as a, Sat as s
 
 deny unless R as r 
 	from Assign as a 
-		count of {r2 from R as r2 where r2.video.type=r.video.type}>2
+		min of {r2.resolution.value from R as r2 where r2.video.type=r.video.type}>2
 		where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
 
 
