@@ -27,7 +27,7 @@ guess from Node as n
 	where n.value=6
 		exactly 1 
 			Assign
-				from Color as c
+				from not Color as c
 					where Assign.node=n and Assign.color=c and c.value="green";
 
 define Node as n
@@ -46,7 +46,7 @@ deny from Edge as e, Node as n
 		or pay 2 at n.value;
 
 deny unless Node as n
-		count of {a from Assign as a where a.node.value=n.value}>=2
+		count of {a from Assign as a where a.node.value=3}>=2
 		where n.value=2
 			or pay 2 at n.value;
 

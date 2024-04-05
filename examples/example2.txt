@@ -15,7 +15,7 @@ guess from Vars as v
 			where Assignment.variable=v;
 
 define Vars as v
-	from Clause, Vars as v2
+	from not Clause, Vars as v2
 		where v.id=Clause.id and Clause.id=1;
 
 @entity Vars: id: int;
@@ -34,7 +34,7 @@ define WeightedClause as w
 define Assignment
 	from Vars as v
 		min of {v.id} == 1
-		where v.id==3 and Assignment.variable=v;
+		where v.id==3 and v=Assignment.variable;
 
 deny from Vars as v
 	sum of {v.id}==2

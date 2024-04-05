@@ -31,7 +31,7 @@ define Sat
 		where Sat.value=2 and f.sat_value=Sat;
 
 define Bit_rate as b
-	from Assign as a, Sat as s
+	from Assign as a, not Sat as s
 		where a.sat_value.value=s.value and a.bit_rate=b;
 
 define Sat
@@ -58,7 +58,7 @@ deny from Assign as a, Sat as s
 
 deny unless R as r 
 	from Assign as a 
-		min of {r2.resolution.value from R as r2 where r2.video.type=r.video.type}>2
+		min of {r2.resolution.value from R as r2}>2
 		where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
 
 
