@@ -3,7 +3,7 @@ import random
 import re
 import subprocess
 from optparse import OptionParser
-from lark import Lark, Transformer, exceptions, Token, ParseTree
+from lark import Lark, Transformer, exceptions, Token
 from collections import defaultdict
 
 class Graph:
@@ -57,12 +57,14 @@ number=0
 g=Graph()
 num_pred={}
 num=0
+list_show=[]
+asp_block=""
 recursive=False
 
 grammar = """
 	start:  _statement+
-	_statement: entity | define | guess | assert_ | deny_ | try_assert | try_deny
-	entity: "@entity" entity_declaration SEMICOLON
+	_statement: entity | define | guess | assert_ | deny_ | try_assert | try_deny | show | asp_block
+	entity: "record" entity_declaration SEMICOLON
 	entity_declaration: ENTITY_NAME COLON declarations
 	declarations: declaration (COMMA declaration)*
 	declaration: NAME COLON attr_type
@@ -143,6 +145,9 @@ grammar = """
 	aggr_entity: NOT? ENTITY_NAME ("as" NAME)?
 	aggr_where: "where" where_aggr_statement (AND where_aggr_statement)*
 	where_aggr_statement: (NAME | ENTITY_NAME) (DOT NAME)* (operator | ASSIGN) var_aggr_define
+	show: "show" ENTITY_NAME (COMMA ENTITY_NAME)* SEMICOLON
+	asp_block: "@asp_block" "$" asp "$"
+	asp: /[^$]+/
 	aggregate_entity: (NAME | ENTITY_NAME) (DOT NAME)*
 	aggregate_term: (NAME | ENTITY_NAME) (DOT NAME)*
 	var_guess:  INT | STR | value_guess
@@ -509,9 +514,7 @@ class CheckTransformer(Transformer):
 			self.negated_atoms.append(alias)
 		return f"{args[0]}() as {alias}"
 	def var(self, args):
-		if(isinstance(args[0], Token)):
-			args[0]+=f"/{args[0].type.lower()}"
-		return self.print_stat(args)
+		return self.var_define(args)
 	def value(self, args):
 		statement=""
 		entity=args[0]
@@ -526,7 +529,10 @@ class CheckTransformer(Transformer):
 		return statement + "/" + attribute
 	def var_define(self, args):
 		if(isinstance(args[0], Token)):
-			args[0]+=f"/{args[0].type.lower()}"
+			type_value=args[0].type.lower()
+			if(type_value=="str"):
+				args[0]=f"'{args[0]}'"
+			args[0]+=f"/{type_value}"
 		return self.print_stat(args)
 	def var_aggr_define(self, args):
 		return self.var_define(args)
@@ -549,9 +555,7 @@ class CheckTransformer(Transformer):
 					raise ValueError(f"{args[0]} is not defined")
 		return self.value_def(args)
 	def var_guess(self, args):
-		if(isinstance(args[0], Token)):
-			args[0]+=f"/{args[0].type.lower()}"
-		return self.print_stat(args)
+		return self.var_define(args)
 	def value_guess(self, args):
 		if(not args[0] in guess_entities[self.count_guess].keys()):
 			raise ValueError(f"{args[0]} is not defined")
@@ -581,7 +585,7 @@ class CheckTransformer(Transformer):
 			statement+=f"{args[i]}"
 		return statement
 	def var_guess_2(self, args):
-		return self.var_guess(args)
+		return self.var_define(args)
 	def value_guess_2(self, args):
 		if not (args[0] in self.guess_alias.keys() or args[0] in self.guess_entities or args[0] in guess_entities[self.count_guess].keys()):
 			raise ValueError(f"{args[0]} is not defined")
@@ -1360,7 +1364,6 @@ class CheckTransformer(Transformer):
 	def find_pattern(self, args):
 		pattern = r'(([A-Z][a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)'
 		self.dep={}
-		print(args)
 		self.condition=""
 		self.all_condition=[]
 		match = re.findall(pattern, args[0])
@@ -1368,7 +1371,6 @@ class CheckTransformer(Transformer):
 			for var in match:
 				self.with_statement(var, self.define_condition)
 		if(len(args)>2):
-			print(args[1])
 			match = re.findall(pattern, args[1])
 			if match:
 				for var in match:
@@ -1574,6 +1576,20 @@ class CheckTransformer(Transformer):
 		return "Assert(False).when("+pre_statement+")"
 	def where_deny_statement(self, args):
 		return self.where_define_statement(args)
+	def show(self, args):
+		for i in range(len(args)):
+			if(args[i]!="," and args[i]!=";"):
+				if not args[i] in entities.keys():
+					raise ValueError(f"Undefined entity: {args[i]}")
+				global list_show
+				list_show.append(args[i].value)
+		return ""
+	def asp_block(self, args):
+		global asp_block
+		asp_block=str(args[0])
+		return ""
+	def asp(self, args):
+		return args[0]
 	def operator(self, args):
 		return self.print_stat(args)
 	def times(self, args):
@@ -1659,7 +1675,7 @@ class CheckTransformer(Transformer):
 		self.guess_count+=1
 		return args
 
-def build_tree(code: str) -> ParseTree:
+def build_tree(code: str):
 	parser_entities = Lark(grammar, parser='lalr', transformer=DeclarationTransformer())
 	parser_entities.parse(code)
 	parser_check = Lark(grammar, parser='lalr', transformer=CheckTransformer())
@@ -1669,13 +1685,39 @@ def check_graph():
 	global g
 	g.SCC()
 
+def execute(solver_path):
+	asp=""
+	if(asp_block!=""):
+		asp+=f"""problem{number}.add(\"\"\"{asp_block}\"\"\")"""
+	execution_string = asp+f"""
+solver = SolverWrapper(solver_path="{solver_path}")
+res = solver.solve(problem=problem{number}, timeout=10)
+if res.status == Result.HAS_SOLUTION:"""
+	if(list_show!=[]):
+		execution_string+="""
+	answer = res.answers[0]
+	print("Found solution: ")"""
+		for atom in list_show:
+			execution_string+=f"""
+	result = answer.get_atom_occurrences({atom}())
+	print(result)"""
+	else:
+		execution_string+="""print("SAT")"""
+	execution_string+="""
+elif res.status == Result.NO_SOLUTION:
+	print("UNSAT")
+else:
+	print("Unknown")
+	"""
+	return execution_string
+
 def main():
 	destination_file = "o.py"
 	parser = OptionParser(usage="Usage: %prog [options] [input_files]")
 	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
 	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
 	parser.add_option("-e", "--execute", dest="execute", help="execute the generated code")
-	parser.add_option("-r", "--recursive", dest="recursive", help="enable recursive checking")
+	parser.add_option("-r", "--disable-recursive", dest="recursive", default=False, help="disable recursive checking")
 	(options, args) = parser.parse_args()
 	code = ''.join(fileinput.input(args))
 	try:
@@ -1683,7 +1725,7 @@ def main():
 			global recursive
 			recursive=True
 		tree = build_tree(code)
-		if options.recursive:
+		if not options.recursive:
 			check_graph()
 		if options.verbose:
 			print(tree)
@@ -1692,16 +1734,7 @@ def main():
 		f = open(f"{destination_file}", "w")
 		f.write(str(tree))
 		if options.execute is not None:
-			execution_string = f"""
-solver = SolverWrapper(solver_path="{options.execute}")
-res = solver.solve(problem=problem{number}, timeout=10)
-if res.status == Result.HAS_SOLUTION:
-	print("Has solution")
-elif res.status == Result.NO_SOLUTION:
-	print("No solution found!")
-else:
-	print("Unknown")
-	"""
+			execution_string=execute(str(options.execute))
 			f.write(execution_string)
 			f.close()
 			subprocess.run(["python", f"{destination_file}"])
