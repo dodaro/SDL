@@ -1695,12 +1695,15 @@ res = solver.solve(problem=problem{number}, timeout=10)
 if res.status == Result.HAS_SOLUTION:"""
 	if(list_show!=[]):
 		execution_string+="""
-	answer = res.answers[0]
-	print("Found solution: ")"""
+	num = 0
+	for answer in res.answers:"""
 		for atom in list_show:
 			execution_string+=f"""
-	result = answer.get_atom_occurrences({atom}())
-	print(result)"""
+		num += 1
+		result = answer.get_atom_occurrences({atom}())
+		result_str = [str(x) for x in result]
+		print("Solution #"+str(num)+": ", end="")
+		print(" ".join(result_str))"""
 	else:
 		execution_string+="""print("SAT")"""
 	execution_string+="""
@@ -1735,6 +1738,8 @@ def main():
 		f.write(str(tree))
 		if options.execute is not None:
 			execution_string=execute(str(options.execute))
+			if options.verbose:
+				print(execution_string)
 			f.write(execution_string)
 			f.close()
 			subprocess.run(["python", f"{destination_file}"])
