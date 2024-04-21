@@ -276,7 +276,7 @@ class DeclarationTransformer(Transformer):
 				raise ValueError(f"Alias already defined: {args[index+1]}")
 		else:
 			if(args[index] in guess_records[self.count_guess].keys()):
-				raise ValueError(f"Record alreaddy defined: {args[index]}")
+				raise ValueError(f"Record already defined: {args[index]}")
 	def number(self, args):
 		letter=args[0].lower()
 		letter+="_"+f"{self.count}"
@@ -949,6 +949,13 @@ class CheckTransformer(Transformer):
 			index=1
 		global g, recursive
 		self.increment_num(args[index])
+		check=index	
+		if(len(args)-index>1):
+			check=index+1
+		if(args[check] in self.aggr_alias or args[check] in guess_records[self.count_guess].keys()):
+			if(check!=index):
+				raise ValueError(f"Alias already defined: {args[check]}")
+			raise ValueError(f"Record already defined: {args[check]}")
 		for alias in guess_alias[self.count_guess].keys():
 			if(alias!="number"):
 				en=guess_records[self.count_guess][alias]
@@ -1334,6 +1341,8 @@ class CheckTransformer(Transformer):
 	def guess_where_statement(self, args):
 		if(not (args[0] in guess_records[self.count_guess].keys() or args[0] in self.guess_alias.keys() or args[0] in self.guess_records)):
 			raise ValueError(f"{args[0]} is not defined")
+		elif(args[0] in self.aggr_alias):
+			raise ValueError(f"{args[0]} is not defined")
 		args=self.guess_where_check(args)
 		if(args==""):
 			return ""
@@ -1604,6 +1613,8 @@ class CheckTransformer(Transformer):
 				pre_statement+=alias+", "
 		return f"with {self.statement}:\n	problem{self.problem}+=Assert(False).when("+pre_statement+f"{args[1]})"
 	def pay(self, args):
+		if(args[0] in self.aggr_alias):
+			raise ValueError(f"{args[0]} is not defined")
 		attribute=self.value_define(args)
 		types=attribute.split("/")
 		if(not types[1]=="int"):
@@ -1837,6 +1848,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
-	
-
