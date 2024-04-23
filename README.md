@@ -1,2 +1,2 @@
-# OODL
-object oriented declarative language
+# SDL
+structured declarative language
