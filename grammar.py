@@ -69,24 +69,24 @@ grammar = """
 	declarations: declaration (COMMA declaration)*
 	declaration: NAME COLON attr_type
 	define: def_1 | def_2 | def_3
-	def_1: define_definition define_from? define_where
-	def_2: define_definition define_from? aggregate define_where
+	def_1: define_definition define_from? define_where ";"
+	def_2: define_definition define_from? define_where aggregate ";"
 	def_3: define_definition define_from? aggregate SEMICOLON
 	define_definition: "define" RECORD_NAME as_statement?
 	as_statement: "as" NAME
 	define_from: "from" define_record (COMMA define_record)*
 	define_record: NOT? RECORD_NAME ("as" NAME)?
-	define_where: "where" where_define_statement (AND where_define_statement)* SEMICOLON
+	define_where: "where" where_define_statement (AND where_define_statement)* 
 	where_define_statement: define_expression operator define_expression
-	define_expression: var_define ((PLUS|MINUS|DIVIDED_BY|TIMES) var_define)* | OB define_expression CB ((PLUS|MINUS|DIVIDED_BY|TIMES) define_expression)*
 	guess: guess_def_1 | guess_def_2
 	guess_def_1: "guess" from_guess where_guess? guess_times? guess_definitions SEMICOLON
-	guess_def_2: "guess" from_guess guess_aggregate where_guess? guess_times? guess_definitions SEMICOLON
+	guess_def_2: "guess" from_guess where_guess? guess_aggregate guess_times? guess_definitions SEMICOLON
 	from_guess: "from" guess_record (COMMA guess_record)*
 	guess_record: NOT? RECORD_NAME ("as" NAME)?
 	where_guess: "where"  where_guess_statement (AND where_guess_statement)*
 	where_guess_statement: var_guess_exp (operator var_guess_exp)
-	guess_times: times (INT| times_value) (AND guess_times)*
+	guess_times: times times_exp (AND guess_times)*
+	times_exp: (INT| times_value) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
 	guess_definitions: guess_definition+
 	guess_definition: RECORD_NAME ("as" NAME)? guess_declaration
 	guess_declaration: guess_from? guess_where
@@ -98,7 +98,7 @@ grammar = """
 	deny_: deny SEMICOLON
 	assert_statement: assert_1 | assert_2 | assert_3
 	assert_1: assert_definition assert_from? where_assert
-	assert_2: assert_definition assert_from? aggregate where_assert
+	assert_2: assert_definition assert_from? where_assert aggregate
 	assert_3: assert_definition assert_from? aggregate
 	assert_definition: "deny unless" assert_records (OR assert_records)*
 	assert_records: RECORD_NAME ("as" NAME)?
@@ -107,7 +107,7 @@ grammar = """
 	where_assert: "where" where_assert_statement (AND where_assert_statement)*
 	where_assert_statement: var_expression operator var_expression
 	deny: deny_1 | deny_2
-	deny_1: "deny" deny_from aggregate? where_deny
+	deny_1: "deny" deny_from where_deny aggregate?
 	deny_2: "deny" deny_from aggregate
 	deny_from: "from" deny_record (COMMA deny_record)*
 	deny_record: NOT? RECORD_NAME ("as" NAME)?
@@ -116,63 +116,65 @@ grammar = """
 	try_assert: assert_otherwise "or" pay_statement SEMICOLON
 	assert_otherwise: assert_otherwise_1 | assert_otherwise_2 | assert_otherwise_3
 	assert_otherwise_1: assert_definition assert_from? where_assert
-	assert_otherwise_2: assert_definition assert_from? aggregate where_assert
+	assert_otherwise_2: assert_definition assert_from? where_assert aggregate
 	assert_otherwise_3: assert_definition assert_from? aggregate
-	pay_statement: "pay" (INT | pay | arithmetic_operation) "at" (INT | pay | arithmetic_operation)
+	pay_statement: "pay" arithmetic_operation "at" arithmetic_operation
 	try_deny: deny_otherwise "or" pay_statement SEMICOLON
 	deny_otherwise: deny_otherwise_1 | deny_otherwise_2
-	deny_otherwise_1: "deny" deny_from aggregate? where_deny
+	deny_otherwise_1: "deny" deny_from where_deny aggregate?
 	deny_otherwise_2: "deny" deny_from aggregate
 	pay: (NAME | RECORD_NAME) (DOT NAME)+
-	var_expression: var ((PLUS|MINUS|DIVIDED_BY|TIMES) var)*
-	arithmetic_operation: (pay | INT) ((PLUS | MINUS | TIMES | DIVIDED_BY) (pay | INT))+
-	guess_aggregate: aggr_def_guess (AND aggr_def_guess)*
+	arithmetic_operation: (pay | INT) | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
+	guess_aggregate: "having" aggr_def_guess (AND aggr_def_guess)*
 	aggr_def_guess: (COUNT | SUM_OF | MIN | MAX) "{" aggr_body_guess (SEMICOLON aggr_body_guess)* "}" operator aggregate_term_guess_exp
 	aggr_body_guess: aggr_body_guess1 | aggr_body_guess2
 	aggr_body_guess1: aggr_records_guess aggregate_from_guess? aggr_where_guess
 	aggr_body_guess2: aggr_records_guess aggregate_from_guess?
-	aggr_records_guess: (aggregate_expression|INT) (COMMA (aggregate_expression|INT))*
+	aggr_records_guess: aggregate_expression (COMMA aggregate_expression)*
 	aggregate_from_guess: "from" aggr_record_guess (COMMA aggr_record_guess)*
 	aggr_record_guess: NOT? RECORD_NAME ("as" NAME)?
 	aggr_where_guess: "where" where_aggr_guess (AND where_aggr_guess)*
 	where_aggr_guess: aggr_guess_exp operator aggr_guess_exp
-	aggregate_term_guess_exp: aggregate_term_guess ((PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_guess)*
+	aggregate_term_guess_exp: aggregate_term_guess  | aggregate_term_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_guess_exp | OB aggregate_term_guess_exp CB
 	aggregate_term_guess: ((NAME | RECORD_NAME) (DOT NAME)*)| INT
-	aggregate: aggr_def (AND aggr_def)*
+	aggregate: "having" aggr_def (AND aggr_def)*
 	aggr_def: (COUNT | SUM_OF | MIN | MAX) "{" aggr_body (SEMICOLON aggr_body)* "}" operator aggregate_term_exp
 	aggr_body: aggr_body_1 | aggr_body_2
 	aggr_body_1: aggr_records aggregate_from? aggr_where
 	aggr_body_2: aggr_records aggregate_from?
-	aggr_records: (aggregate_expression|INT) (COMMA (aggregate_expression|INT))*
+	aggr_records: aggregate_expression (COMMA aggregate_expression)*
 	aggregate_from: "from" aggr_record (COMMA aggr_record)*
 	aggr_record: NOT? RECORD_NAME ("as" NAME)?
 	aggr_where: "where" where_aggr_statement (AND where_aggr_statement)*
 	where_aggr_statement: exp_aggr_define operator exp_aggr_define
 	show: "show" RECORD_NAME (COMMA RECORD_NAME)* SEMICOLON
 	asp_block: "@asp_block" "$" asp "$"
-	asp: /[^$]+/
-	aggregate_expression: aggregate_record | ((aggregate_record|INT) ((PLUS | MINUS | TIMES | DIVIDED_BY) (aggregate_record|INT))+)
-	aggregate_record: (NAME | RECORD_NAME) (DOT NAME)*
-	aggregate_term_exp: aggregate_term ((PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term)*
+	define_expression: var_define | define_expression (PLUS | MINUS | TIMES | DIVIDED_BY) define_expression | OB define_expression CB
+	var_expression: var | var_expression (PLUS | MINUS | TIMES | DIVIDED_BY) var_expression | OB var_expression CB
+	aggregate_expression: (aggregate_record|INT) | aggregate_expression (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_expression | OB aggregate_expression CB
+	aggregate_record: (NAME | RECORD_NAME) (DOT NAME)* 
+	aggregate_term_exp: aggregate_term | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
 	aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT
-	var_guess_exp: var_guess ((PLUS | MINUS | TIMES | DIVIDED_BY) var_guess)*
+	var_guess_exp: var_guess | var_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp | OB var_guess_exp CB
+	asp: /[^$]+/
 	var_guess:  INT | STR | value_guess
 	value_guess: (NAME | RECORD_NAME) (DOT NAME)*
 	times_value: (NAME | RECORD_NAME) (DOT NAME)+
 	value: (NAME | RECORD_NAME) (DOT NAME)*
-	var_guess_exp_2: var_guess_2 ((PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_2)*
+	var_guess_exp_2: var_guess_2  | var_guess_exp_2 (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp_2 | OB var_guess_exp_2 CB
 	var_guess_2:  INT | STR | value_guess_2
 	var: INT | STR | value
 	value_guess_2: (NAME | RECORD_NAME) (DOT NAME)*	
 	var_define: INT | STR | value_define
-	aggr_guess_exp: var_aggr_guess ((PLUS | MINUS | TIMES | DIVIDED_BY) var_aggr_guess)*
-	exp_aggr_define: var_aggr_define ((PLUS | MINUS | TIMES | DIVIDED_BY) var_aggr_define)*
+	aggr_guess_exp: var_aggr_guess | aggr_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggr_guess_exp | OB aggr_guess_exp CB
+	exp_aggr_define: var_aggr_define | exp_aggr_define (PLUS | MINUS | TIMES | DIVIDED_BY) exp_aggr_define | OB exp_aggr_define CB
 	var_aggr_define: INT | STR | value_aggr_define
 	var_aggr_guess: INT | STR | value_aggr_guess
 	value_aggr_define: (NAME | RECORD_NAME) (DOT NAME)*	
 	value_aggr_guess: (NAME | RECORD_NAME) (DOT NAME)*	
 	value_define: (NAME | RECORD_NAME) (DOT NAME)*	
-	operator: EQUALITY | LT | LE | GT | GE | NOTEQUAL
+	operator: op+
+	op:  EQUALITY | LT | LE | GT | GE | NOTEQUAL | ASSIGN
 	bool_operator: AND | OR
 	times: EXACTLY | ATLEAST | ATMOST
 	attr_type: ANY | STRING | INTEGER | RECORD_NAME | REGEX
@@ -195,19 +197,20 @@ grammar = """
 	GT: ">"
 	LT: "<"
 	LE: "<="
+	ASSIGN: "="
 	AND: "and"
 	NOT: "not"
 	OR: "or"
-	COUNT: "count of"
-	SUM_OF: "sum of"
+	COUNT: "count"
+	SUM_OF: "sum"
 	EXACTLY: "exactly"
 	ATLEAST: "at least"
 	ATMOST: "at most"
 	ANY: "any"
 	STRING: "str"
 	INTEGER: "int"
-	MAX: "max of"
-	MIN: "min of"
+	MAX: "max"
+	MIN: "min"
 	STR: /"[^"]*"/
 	INT: /[0-9]+/
 	%import common.WS
@@ -401,6 +404,9 @@ class CheckTransformer(Transformer):
 	def def_2(self, args):
 		when=""
 		if(len(args)>3):
+			temp=args[2]
+			args[2]=args[3]
+			args[3]=temp
 			when=self.when_define(args[1])
 		self.statement=""
 		for aggr in self.aggregate_with:
@@ -479,7 +485,7 @@ class CheckTransformer(Transformer):
 	def define_where(self, args):
 		statements=""
 		for i in range(len(args)):
-			if(not args[i]==";" and not args[i]=="and"):
+			if(not args[i]=="and"):
 				statements+=f"{args[i]}"
 		for alias in self.new_define_alias.keys():
 			return statements + f").define({self.new_define_alias[alias]})\n"
@@ -556,9 +562,17 @@ class CheckTransformer(Transformer):
 			statement+=f"{args[i]}"
 		return statement + "/" + attribute
 	def define_expression(self,args):
-		stat=f"{args[0]}"
-		if(len(args)>1):
+		stat=f""
+		operators=["*","+","-","$"]
+		integer=False
+		for o in operators:
+			for i in range(len(args)):
+				if o in args[i]:
+					integer=True
+					break	
+		if(integer):
 			stat=""
+			term=""
 			for i in range(len(args)):
 				if(args[i]=="(" or args[i]==")"):
 					stat+=args[i]
@@ -571,10 +585,23 @@ class CheckTransformer(Transformer):
 						raise ValueError("Unsupported arithmetic operation. Unable to perform the operation on a non-numeric data type.")
 					args[i]=types[0]
 					self.define_expressions.append(args[i])
+					term="/"+types[1]
 				stat+=args[i]
-			stat+="/int"
+			stat+=term
 		else:
+			types=[]
 			self.define_expressions.append(args[0])
+			for i in range(len(args)):
+				if("/"==args[i]):
+					stat+="$"
+					continue
+				if("/" in args[i]):
+					types=args[i].split("/")
+					args[i]=types[0]
+				if not (args[i]=="(" or args[i]==")"):
+					stat+=args[i]
+			if(types!=[]):
+				stat+="/"+str(types[1])
 		return stat
 	def var_define(self, args):
 		if(isinstance(args[0], Token)):
@@ -584,19 +611,44 @@ class CheckTransformer(Transformer):
 			args[0]+=f"/{type_value}"
 		return self.print_stat(args)
 	def exp_aggr_define(self, args):
-		stat=f"{args[0]}"
-		if(len(args)>1):
-			stat=""
+		stat=""
+		operators=["*","+","-","$"]
+		integer=False
+		for o in operators:
 			for i in range(len(args)):
+				if o in args[i]:
+					integer=True
+					break	
+		if(integer):
+			stat=""
+			term=""
+			for i in range(len(args)):
+				if(args[i]==")" or args[i]=="("):
+					stat+=args[i]
+					continue
 				if(args[i]=="/"):
 					args[i]="$"
 				if("/" in args[i]):
 					types=args[i].split("/")
 					if(types[1]!="int" and types[1]!="any"):
 						raise ValueError("Unsupported arithmetic operation. Unable to perform the operation on a non-numeric data type.")
-					if(not i==len(args)-1):
-						args[i]=types[0]
+					args[i]=types[0]
+					term="/"+types[1]
 				stat+=args[i]
+			stat+=term
+		else:
+			types=[]
+			for i in range(len(args)):
+				if("/"==args[i]):
+					stat+="$"
+					continue
+				if("/" in args[i]):
+					types=args[i].split("/")
+					args[i]=types[0]
+				if not (args[i]=="(" or args[i]==")"):
+					stat+=args[i]
+			if(types!=[]):
+				stat+="/"+str(types[1])
 		return stat
 	def var_aggr_define(self, args):
 		return self.var_define(args)
@@ -645,13 +697,23 @@ class CheckTransformer(Transformer):
 		for i in range(len(args)):
 			statement+=f"{args[i]}"
 		return statement+ "/" + attribute
+	def times_exp(self, args):
+		stat=""
+		for i in range(len(args)):
+			if(args[i]==")" or args[i]=="("):
+				stat+=args[i]
+				continue
+			if(args[i]=="/"):
+				args[i]="$"
+			stat+=args[i]
+		return stat
 	def times_value(self, args):
 		statement=""
 		if not (args[0] in  guess_records[self.count_guess].keys()):
 				raise ValueError(f"Record not defined: {args[0]}")
 		attribute=self.attributes_guess_check(args)
-		if(attribute!="int" and attributes!="any"): #any?
-			raise ValueError(f"Expected int, received {attribute}: {statements}")
+		if(attribute!="int" and attribute!="any"):
+			raise ValueError(f"Expected int, received: {attribute}")
 		if(args[0] in self.new_guess_alias.keys()):
 			args[0]=self.new_guess_alias[args[0]]
 		elif(args[0] in guess_alias[self.count_guess].keys()):
@@ -669,40 +731,6 @@ class CheckTransformer(Transformer):
 		elif(args[0] in self.aggr_alias):
 			raise ValueError(f"{args[0]} is not defined")
 		return self.value_guess_check(args)
-	def where_stat_check_2(self, args, types, attribute):
-		if(len(args)<=3):
-			temp_array=[]
-			if("." in types[0]):
-				splitted=types[0].split(".")
-				for split in splitted:
-					temp_array.append(split)
-					temp_array.append(".")
-				temp_array.pop()
-			else:
-				temp_array.append(types[0])
-			temp_array.append(args[-2])
-			temp_array.append(args[0])
-			args=temp_array
-		else:
-			args[-1]=types[0]
-		if(args[-2]!="==" or not "." in types[0] and not "." in args):
-			raise TypeError(f"Cannot compare objects of these types: {attribute}")
-		if(args[-2]=="=="):
-			args[-2]="="
-		c=f"{args[2]} {self.print_stat(args[3:])}"
-		self.define_condition.append(args[0])
-		self.define_condition.append(c)
-		self.define_condition.append(args[-1])
-		if("." in c.split("=")[0]):
-			self.define_condition_args[c]=args
-			record=self.define_condition_args[c][0]
-			for k,v in self.new_define_alias.items():
-				if(v==record):	
-					if(k in records.keys()):
-						self.define_condition_args[c][0]=k
-					else:
-						self.define_condition_args[c][0]=self.declared_alias[k]
-		return ""
 	def isNum(self,args):
 		num=True
 		try:
@@ -711,6 +739,8 @@ class CheckTransformer(Transformer):
 			num=False
 		return num
 	def where_stat_check(self, args):
+		if(args[-2]=="="):
+			raise TypeError("Unexpected operator \"=\". Did you mean to use \"==\" instead?")
 		splitted=args[0].split("/")
 		attribute=splitted[1]
 		statement=", "
@@ -731,10 +761,8 @@ class CheckTransformer(Transformer):
 			new_args.pop()
 			new_args.append(args[1])
 			new_args.append(args[2])
-			if(new_args[-2]!="=="):
-				op=new_args[-2]
-				return ", Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{op}"+"{"+f"{types[0]}"+"}\")), True)"
-			return self.where_stat_check_2(new_args, types,attribute)
+			op=new_args[-2]
+			return ", Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{op}"+"{"+f"{types[0]}"+"}\")), True)"
 		args[-1]=types[0]
 		for i in range(len(args)):
 			statement+=f"{args[i]}"
@@ -798,12 +826,12 @@ class CheckTransformer(Transformer):
 	def aggregate_body(self, args, new_alias, declared_alias):
 		self.aggregate_records=set()
 		var = re.findall(r'\b(?:\w+(?:\.\w+)*|\S+)\b', args[0][0][0])
-		sum_bool=""
+		sum_bool="True/"
 		sum_array=[]
 		for v in var:
 			num=True
 			try:
-   				num=int(v)
+   				n=int(v)
 			except ValueError:
 				num=False
 			if(not num):
@@ -917,7 +945,7 @@ class CheckTransformer(Transformer):
 				if(not ":" in bool_sum[0]):
 					bool_sum[1]=bool_sum[0]+"/"+bool_sum[1]
 					bool_sum=bool_sum[1:]
-				if(args[0]!="count of" and bool_sum[1]!="True"):	
+				if(args[0]!="count" and bool_sum[1]!="True"):	
 					raise ValueError(f"Expected int, received {bool_sum[2]}")
 				args[i]=bool_sum[0]
 			if(args[i]==";"):
@@ -925,11 +953,11 @@ class CheckTransformer(Transformer):
 			stat+=args[i]
 		stat+="})"+f"{args[-2]}{args[-1]}"
 		function=""
-		if(args[0]=="count of"):
+		if(args[0]=="count"):
 			function="Count"
-		elif(args[0]=="min of"):
+		elif(args[0]=="min"):
 			function="Min"
-		elif(args[0]=="max of"):
+		elif(args[0]=="max"):
 			function="Max"
 		else:
 			function="Sum"
@@ -1122,9 +1150,8 @@ class CheckTransformer(Transformer):
 		self.guess_def_check(args)
 		if(len(args)==4):
 			if("exactly" in args[1] or "at least" in args[1] or "at most" in args[1]):
-				if(" " in args[1]):
-					temp=args[1].split(" ")
-					args[1]=temp[0]+"_"+temp[1]
+				args[1]=args[1].replace("at least", "at_least")
+				args[1]=args[1].replace("at most", "at_most")
 				return f"with {self.statement[:-1]}).guess("+"{"+f"{cond}"+"}"+f", {args[1]}"+")"+"\n"
 			else:
 				substring = args[1].split(" , ")
@@ -1138,6 +1165,8 @@ class CheckTransformer(Transformer):
 				return f"with {self.statement[:-1]}).guess("+"{"+f"{cond}"+"})"+"\n"
 		if(len(args)==3):
 			return f"with {self.statement[:-1]}).guess("+"{"+f"{cond}"+"})"+"\n"
+		args[2]=args[2].replace("at least", "at_least")
+		args[2]=args[2].replace("at most", "at_most")
 		substring = args[1].split(" , ")
 		args[1] = " ".join(substring)
 		if(len(args[1])>2):
@@ -1147,6 +1176,10 @@ class CheckTransformer(Transformer):
 				args[1]=args[1][:-2]
 		return f"with {self.statement} {args[1]}).guess("+"{"+f"{cond}"+"}"+f", {args[2]}"+")"+"\n"
 	def guess_def_2(self, args):	
+		if (len(args)==5 and not ("exactly" in args[2] or "at least" in args[2] or "at most" in args[2])) or len(args)==6:
+			temp=args[1]
+			args[1]=args[2]
+			args[2]=temp
 		cond=self.guess_def(args, 4)
 		pattern = r'(([A-Z]+[a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)'
 		if(self.aggregate_with!=[]):
@@ -1158,9 +1191,8 @@ class CheckTransformer(Transformer):
 		self.guess_def_check(args)
 		if(len(args)==5):
 			if("exactly" in args[2] or "at least" in args[2] or "at most" in args[2]):
-				if(" " in args[2]):
-					temp=args[2].split(" ")
-					args[2]=temp[0]+"_"+temp[1]
+				args[2]=args[2].replace("at least", "at_least")
+				args[2]=args[2].replace("at most", "at_most")
 				return f"with {self.statement[:-1]}, {args[1]}).guess("+"{"+f"{cond}"+"}"+f", {args[2]}"+")"+"\n"
 			else:
 				substring = args[2].split(" , ")
@@ -1174,6 +1206,8 @@ class CheckTransformer(Transformer):
 				return f"with {self.statement[:-1]}, {args[1]}).guess("+"{"+f"{cond}"+"})"+"\n"
 		if(len(args)==4):
 			return f"with {self.statement[:-1]}, {args[1]}).guess("+"{"+f"{cond}"+"})"+"\n"
+		args[3]=args[3].replace("at least", "at_least")
+		args[3]=args[3].replace("at most", "at_most")
 		substring = args[2].split(" , ")
 		args[2] = " ".join(substring)
 		if(len(args[2])>2):
@@ -1399,42 +1433,9 @@ class CheckTransformer(Transformer):
 		for i in range(len(args)):
 			stat+=args[i]
 		return stat
-	def guess_where_check_2(self, args, types, attribute):
-		if(len(args)<=3):
-			temp_array=[]
-			if("." in types[0]):
-				splitted=types[0].split(".")
-				for split in splitted:
-					temp_array.append(split)
-					temp_array.append(".")
-				temp_array.pop()
-			else:
-				temp_array.append(types[0])
-			temp_array.append(args[-2])
-			temp_array.append(args[0])
-			args=temp_array
-		else:
-			args[-1]=types[0]
-		if(args[-2]=="=="):
-			args[-2]="="
-		self.guess_condition.append(args[0])
-		cond=f"{args[2]} {self.print_stat(args[3:])}"
-		self.guess_condition.append(cond)
-		self.guess_condition.append(args[-1])
-		if("." in cond.split("=")[0]):
-			self.guess_condition_args[cond]=args
-			record=self.guess_condition_args[cond][0]
-			if(record in guess_alias[self.count_guess].values()):
-				for k, v in guess_alias[self.count_guess].items():
-					if(v==record):
-						self.guess_condition_args[cond][0]=self.attributes_guess_check(k)
-						break
-			else:
-				for k, v in self.new_guess_alias.items():
-					if(v==record):
-						self.guess_condition_args[cond][0]=self.guess_alias[k]
-						break
 	def guess_where_check_(self, args):
+		if(args[-2]=="="):
+			raise TypeError("Unexpected operator \"=\". Did you mean to use \"==\" instead?")
 		splitted=args[0].split("/")
 		attribute=splitted[1]
 		args[0]=splitted[0]
@@ -1459,11 +1460,8 @@ class CheckTransformer(Transformer):
 			new_args.pop()
 			new_args.append(args[1])
 			new_args.append(args[2])
-			if(new_args[-2]!="=="):
-				op=new_args[-2]
-				return "Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{op}"+"{"+f"{types[0]}"+"}\")), True)"
-			self.guess_where_check_2(new_args, types,attribute)
-			return ""
+			op=new_args[-2]
+			return "Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{op}"+"{"+f"{types[0]}"+"}\")), True)"
 		args[-1]=types[0]
 		return args		
 	def assert_statement(self, args):
@@ -1475,6 +1473,14 @@ class CheckTransformer(Transformer):
 			return f"with {self.statement}:\n	problem{self.problem}+={args[2]}"
 		return f"with {self.statement}:\n	problem{self.problem}+={args[1]}"
 	def assert_2(self, args):
+		if(len(args)==4):
+			temp=args[2]
+			args[2]=args[3]
+			args[3]=temp
+		else:
+			temp=args[1]
+			args[1]=args[2]
+			args[2]=temp
 		self.assert_deny_with(args)
 		self.init_define_variables()
 		if(len(args)>3):
@@ -1627,7 +1633,13 @@ class CheckTransformer(Transformer):
 		if(len(args)>2):
 			return f"with {self.statement}:\n	problem{self.problem}+={args[2]}"
 		return f"with {self.statement}:\n	problem{self.problem}+={args[1]}"
-	def assert_otherwise_2(self, args):
+	def assert_otherwise_2(self, args):	
+		index=0
+		if(len(args)==4):
+			index=1
+		temp=args[1+index]
+		args[1+index]=args[2+index]
+		args[2+index]=temp
 		self.assert_deny_with(args)
 		if(len(args)>3):
 			end_assert=args[3][:-1]
@@ -1663,6 +1675,10 @@ class CheckTransformer(Transformer):
 	def deny_otherwise(self, args):
 		return args[0]
 	def deny_otherwise_1(self, args):
+		if(len(args)==3):
+			temp=args[2]
+			args[2]=args[1]
+			args[1]=temp
 		self.assert_deny_with(args)
 		if(len(args)>=3):
 			end_assert=args[2][:-1]
@@ -1694,6 +1710,10 @@ class CheckTransformer(Transformer):
 	def deny(self, args):
 		return args[0]
 	def deny_1(self, args):
+		if(len(args)==3):
+			temp=args[2]
+			args[2]=args[1]
+			args[1]=temp
 		self.assert_deny_with(args)
 		self.init_define_variables()
 		if(len(args)>=3):
@@ -1752,7 +1772,11 @@ class CheckTransformer(Transformer):
 	def asp(self, args):
 		return args[0]
 	def operator(self, args):
-		return self.print_stat(args)
+		if(len(args)>1):
+			raise ValueError(f"Operator {"".join(args)} is not supported.")
+		return "".join(args)
+	def op(self, args):
+		return args[0]
 	def times(self, args):
 		return args[0]+"="
 	def print_stat(self, args):
@@ -1846,9 +1870,6 @@ def check_graph():
 	global g
 	g.SCC()
 
-def print_program():
-	return f"\nprint(problem{number})\n"
-
 def execute(solver_path):
 	asp=""
 	if(asp_block!=""):
@@ -1884,14 +1905,13 @@ def main():
 	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
 	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
 	parser.add_option("-e", "--execute", dest="execute", help="execute the generated code")
-	parser.add_option("-r", "--disable-recursive-check", dest="recursive", default=False, help="disable recursive checking", action="store_true")
-	parser.add_option("-p", "--print-program", dest="print_program", default=False, help="print ASP program", action="store_true")
+	parser.add_option("-r", "--disable-recursive", dest="recursive", default=False, help="disable recursive checking")
 	(options, args) = parser.parse_args()
 	code = ''.join(fileinput.input(args))
 	try:
 		global recursive
-		if options.recursive:
-			recursive = True
+		if(options.recursive):
+			recursive=True
 		tree = build_tree(code)
 		if recursive:
 			check_graph()
@@ -1901,20 +1921,15 @@ def main():
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
 		f.write(str(tree))
-		has_to_close = True
-		if options.print_program:
-			f.write(print_program())
-			if options.execute is None:
-				f.close()
-				subprocess.run(["python", f"{destination_file}"])
 		if options.execute is not None:
 			execution_string=execute(str(options.execute))
 			if options.verbose:
 				print(execution_string)
 			f.write(execution_string)
 			f.close()
-			subprocess.run(["python", f"{destination_file}"])	
-		f.close()
+			subprocess.run(["python", f"{destination_file}"])
+		else:
+			f.close()
 	except exceptions.LarkError as e:
 		print(f"Parsing error: {e}")
 	except Exception as e:
