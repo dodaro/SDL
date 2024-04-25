@@ -49,10 +49,10 @@ class Graph:
 			if disc[i] == -1:
 				self.SCCUtil(i, low, disc, stackMember, st)
 
-records = {} #dizionario con chiave nome dell'entità e valore la lista dei parametri e rispettivi tipi
-guess={} #dizionario di alias ed entità del primo from del guess
-guess_alias={} #dizionario dei nuovi alias delle entità interne al guess
-guess_records={} #dizionario di tutte le entità e alias del costrutto guess
+records = {}
+guess={}
+guess_alias={}
+guess_records={}
 number=0
 g=Graph()
 num_pred={}
@@ -231,14 +231,14 @@ class DeclarationTransformer(Transformer):
 		if(record_name in records.keys()):
 			raise ValueError(f"Record already defined: {record_name}")
 		records[record_name]=[]
-		for i in range(0, len(declarations), 2): #per ogni entità dichiarata
+		for i in range(0, len(declarations), 2):
 			attr=declarations[i].children
 			token=attr[2].children
 			attr_type=token[0] 
-			if(attr_type==record_name): #si definisce come tipo dell'attributo l'entità stessa
+			if(attr_type==record_name):
 				raise ValueError("Recursive dependencies between records")
-			attr[0].type=str(attr_type) #salvo il tipo dell'attributo nel token
-			records[record_name].append(attr[0]) #aggiungo nella lista degli attributi
+			attr[0].type=str(attr_type)
+			records[record_name].append(attr[0])
 		return args
 	def guess(self, args):
 		self.count_guess+=1
@@ -295,37 +295,30 @@ class DeclarationTransformer(Transformer):
 
 class CheckTransformer(Transformer):
 	def __init__(self):
-		self.declared_alias={} #dizionario degli alias dichiarati nel from di ogni define e con valore l'entità
-		self.defined_records=set() #entità definite nel from di ogni define
-		self.attributes={} #dizionario con chiave l'entità/l'alias e valore la lista degli attributi, inizializzato ad ogni define
-		self.defined_record=set() #entità definita nella define
-		self.redefined_record={} #alias dell'entità definita nella define
-		self.new_define_alias={} #nuovi alias del costrutto define con chiave l'alias/entità
-		self.new_guess_alias={} #nuovi alias del costrutto guess con chiave l'alias/entità
-		self.guess_alias={} #alias del costrutto guess
-		self.guess_records=set() #entità del costrutto guess
-		self.count_guess=0 #numero progressivo per gli alias del guess
-		self.guess_count=guess_alias[0]["number"] #numero da cui partire per gli alias del guess
-		self.count_define=0 #numero progressivo per gli alias della define
+		self.declared_alias={}
+		self.defined_records=set()
+		self.attributes={}
+		self.defined_record=set()
+		self.redefined_record={}
+		self.new_define_alias={}
+		self.new_guess_alias={}
+		self.guess_alias={}
+		self.guess_records=set()
+		self.count_guess=0
+		self.guess_count=guess_alias[0]["number"]
+		self.count_define=0
 		self.dependencies={}
-		self.guess_check=[] #per controllare che le entità e alias utlizzati nel secondo where del guess siano quelle previste
-		#variabili utilizzate all'interno del with statement
-		self.dep={}
-		self.all_dependencies=[]
+		self.guess_check=[]
 		self.statement=""
-		self.condition=""
 		self.otherwise_en=[]
-		self.guess_condition=[] #condizioni che vanno inserite direttamente nel with
-		self.guess_condition_args={}
-		self.define_condition=[] #condizioni da inserire nel with
-		self.define_condition_args={}
 		self.aggregate_records=set()	
-		self.aggr_guess_record=[] #records visibili da ogni aggr_body
-		self.aggr_alias=[] #alias e entità da togliere per non farle riconoscere nel where della define / assert / ecc..
+		self.aggr_guess_record=[]
+		self.aggr_alias=[]
 		self.aggr_new_alias={}
 		self.aggregate_with=[]
 		self.records_attributes=[]
 		self.negated_atoms=[]
+		self.negated={}
 		self.define_expressions=[]
 		self.problem=random.randint(0,100)
 		global number
@@ -356,6 +349,35 @@ class CheckTransformer(Transformer):
 		ordered.append(f"\nproblem{self.problem} = Problem()\n\n")
 		ordered.extend(others)
 		return "".join(ordered)	
+	def negated_atoms_check(self, args):
+		for neg in self.negated.keys():
+			replace_string=""
+			keys=self.find_false_keys(self.negated[neg])
+			for i in range(len(keys)):
+				splitted=keys[i].split(".")
+				if(replace_string!=""):
+					replace_string+=", "
+				replace_string+=f"{splitted[0]}="
+				count=0
+				fixed =str(neg)
+				pattern = re.compile(r'((([A-Z][a-zA-Z0-9_]*))\(\)\s+as\s+{})(?:\s|,|:)'.format(re.escape(fixed)))
+				match = pattern.search(args[0])
+				term=""
+				toReplace=""
+				if match:
+					term = match.group(2)
+					toReplace=match.group(1)
+				for split in splitted:
+					for attr in records[term]:
+						if(split==attr.value):
+							count+=1
+							replace_string+=f"{attr.type}({splitted[count]}="
+				replace_string+="hide()"
+				for c in range(count):
+					replace_string+=")"
+				args[0]=args[0].replace(toReplace, f"{term}({replace_string}) as {neg}")
+		self.negated={}
+		return args[0]
 	def record(self, args):	
 		self.records_attributes=[]
 		return f"@atom\n{args[0]}\n"
@@ -388,13 +410,14 @@ class CheckTransformer(Transformer):
 		return f"	{args[0]}: {args[2]}"
 	def attr_type(self, args):
 		return args[0]
-	def define(self, args):
-		return args[0]
+	def define(self, args):	
+		return self.negated_atoms_check(args)
 	def def_1(self, args):
 		when=""
 		if(len(args)>2):
 			when=self.when_define(args[1])
-		self.check_statement(args)
+		self.statement=""
+		self.find_pattern(args)
 		self.init_define_variables()
 		if(len(args)>2):
 			return f"with {self.statement}:\n{when}{args[2]}"
@@ -414,7 +437,6 @@ class CheckTransformer(Transformer):
 		self.find_pattern(args)
 		if(self.aggregate_with!=[]):
 			self.addEdge(self.aggregate_with)
-		self.define_condition=[]
 		self.init_define_variables()
 		if(len(args)>3):
 			return f"with {self.statement}:\n{when}, {args[2]}{args[3]}"
@@ -430,7 +452,6 @@ class CheckTransformer(Transformer):
 		self.find_pattern(args)
 		if(self.aggregate_with!=[]):
 			self.addEdge(self.aggregate_with)
-		self.define_condition=[]
 		stat2=""
 		for alias in self.new_define_alias.keys():
 			stat2=f").define({self.new_define_alias[alias]})\n"
@@ -511,6 +532,16 @@ class CheckTransformer(Transformer):
 		return f"{args[0]}() as {alias}"
 	def as_statement(self, args):
 		return f"{args[0]}"
+	def build_nested_dictionary(self, alias, args, current_dict=None):
+		if current_dict is None:
+			current_dict = {}
+		for attr in records[args[0]]:
+			if attr.type in ("int", "str", "any"):
+				current_dict[attr.value] = False
+			else:
+				current_dict[attr.value] = {}
+				self.build_nested_dictionary(alias, [attr.type], current_dict[attr.value])
+		return current_dict
 	def define_record(self, args):
 		negated=False
 		if(args[0]=="not"):
@@ -519,7 +550,7 @@ class CheckTransformer(Transformer):
 		if(not args[0] in records.keys()):
 			raise ValueError(f"Undefined record: {args[0]}")
 		var=""
-		if(len(args)>1): #se è stato definito l'alias aggiungo in declared_alias altrimenti in defined_records
+		if(len(args)>1):
 			if(args[1] in self.declared_alias or args[1] in self.redefined_record.keys()):
 				raise ValueError(f"Alias already defined: {args[1]}")
 			self.declared_alias[args[1]]=args[0]
@@ -533,16 +564,20 @@ class CheckTransformer(Transformer):
 		all_attr=[]
 		for i in range(len(attr)):
 			all_attr.append(attr[i]) 
-		self.attributes[var]=all_attr #lista degli attributi dell'entità
+		self.attributes[var]=all_attr
 		if(len(args)>1):
 			alias=self.add_number(args[1])
 			self.new_define_alias[args[1].value]=alias
 			if(negated):
+				self.negated[alias]={}
+				self.negated[alias]=self.build_nested_dictionary(alias, args)
 				self.negated_atoms.append(alias)
 			return f"{args[0]}() as {alias}"
 		alias=self.number(args[0])
 		self.new_define_alias[args[0].value]=alias
 		if(negated):
+			self.negated[alias]={}
+			self.negated[alias]=self.build_nested_dictionary(alias, args)
 			self.negated_atoms.append(alias)
 		return f"{args[0]}() as {alias}"
 	def var_expression(self,args):
@@ -664,7 +699,6 @@ class CheckTransformer(Transformer):
 	def value_aggr_define(self, args):
 		if(not args[0] in self.declared_alias.keys()and not args[0] in self.defined_records):
 					raise ValueError(f"{args[0]} is not defined")
-		#if(not (args[0] in self.redefined_record.keys() or args[0] in self.defined_record)):
 		return self.value_def(args)
 	def value_define(self, args):
 		if(not (args[0] in self.redefined_record.keys() or args[0] in self.defined_record)):
@@ -738,6 +772,18 @@ class CheckTransformer(Transformer):
 		except:
 			num=False
 		return num
+	def access_nested_dict(self, dictionary, keys):
+		if not keys:
+			return
+		curr_keys = keys[0]
+		if curr_keys in dictionary:
+			nested_dictionary = dictionary[curr_keys]
+			if len(keys) == 1:
+				dictionary[curr_keys] = True
+			else:
+				return self.access_nested_dict(nested_dictionary, keys[1:])
+		else:
+			pass
 	def where_stat_check(self, args):
 		if(args[-2]=="="):
 			raise TypeError("Unexpected operator \"=\". Did you mean to use \"==\" instead?")
@@ -752,17 +798,10 @@ class CheckTransformer(Transformer):
 			if(args[-2]!="=="):
 				raise ValueError(f"{types[1]} cannot be compared with type: {attribute}")
 			raise ValueError(f"{types[1]} cannot be assigned to type {attribute}")
+		if(self.negated_atoms!=[]):
+			self.check_negated_atoms(args)	
 		if(attribute!="str" and attribute!="int" and attribute!="any"):
-			point_split=splitted[0].split(".")
-			new_args=[]
-			for p in point_split:
-				new_args.append(p)
-				new_args.append(".")
-			new_args.pop()
-			new_args.append(args[1])
-			new_args.append(args[2])
-			op=new_args[-2]
-			return ", Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{op}"+"{"+f"{types[0]}"+"}\")), True)"
+			return ", Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{args[-2]}"+"{"+f"{types[0]}"+"}\")), True)"
 		args[-1]=types[0]
 		for i in range(len(args)):
 			statement+=f"{args[i]}"
@@ -1065,34 +1104,31 @@ class CheckTransformer(Transformer):
 			self.aggr_new_alias[self.new_define_alias[args[index]]]=args[index]
 		return return_value	
 	def guess(self,args):
-		return args[0].replace("$","/")
+		return self.negated_atoms_check(args).replace("$","/")
 	def guess_def(self, args, index):
 		length=index
 		self.statement=""
-		self.condition=""
-		self.all_condition=[]
 		cond=""
 		pattern = r'(([A-Z][a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)'
 		if(len(args)==length+1):
 			index-=1
 		elif(len(args)==length):
 			index-=2
-		self.dep={}
 		match = re.findall(pattern, args[0])
 		if match:
 			for var in match:
-				self.with_statement(var, self.guess_condition)
+				self.statement+=var[0]+", "
 		pattern = r'(([A-Z][a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)((.*?)/(.*?))\\'
 		match = re.findall(pattern, args[index])
 		if match:
 			for var in match:
-				self.with_statement(var, self.guess_condition)
+				self.statement+=var[0]+", "
 				cond+=f"{var[2]}:("
 				pattern2 = r'(([A-Z][a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)'
 				match2 = re.findall(pattern2, var[3])
 				if match2:
 					for var2 in match2:
-						self.with_statement(var2, self.guess_condition)
+						self.statement+=var2[0]+", "
 						if var2[2] in self.negated_atoms:
 							cond+="~"
 						cond+=var2[2]+", "
@@ -1113,17 +1149,6 @@ class CheckTransformer(Transformer):
 	def guess_def_check(self, args):
 		pattern = r'(([A-Z]+[a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)'
 		match = re.findall(pattern, args[0])
-		length=len(self.all_condition)
-		while(len(self.all_condition)>0):
-			for c in self.all_condition:
-				if(all(d in self.statement for d in self.dep[c])):
-					self.statement+=c+", "
-					self.all_condition.remove(c)
-					break
-			if(len(self.all_condition)==length):
-				raise ValueError("Circular dependencies detected")
-			else:
-				length-=1
 		self.statement=self.statement[:-2]
 		self.statement+=f":\n	problem{self.problem}+=When("
 		if match:
@@ -1132,11 +1157,9 @@ class CheckTransformer(Transformer):
 					self.statement+="~"
 				self.statement+=var[2]+", "
 			self.statement=self.statement[:-1]
-		self.guess_condition=[]
-		self.guess_condition_args={}
 		self.count_guess+=1
 		self.guess_count=guess_alias[self.count_guess]["number"]
-		self.new_guess_alias={} #nuovi alias del costrutto guess con chiave l'alias/entità
+		self.new_guess_alias={}
 		self.guess_alias={}
 		self.guess_check=[]
 		self.guess_records=set()
@@ -1187,7 +1210,7 @@ class CheckTransformer(Transformer):
 				match = re.findall(pattern, self.aggregate_with[i])
 				if match:
 					for var in match:
-						self.with_statement(var, self.guess_condition)
+						self.statement+=var[0]+", "
 		self.guess_def_check(args)
 		if(len(args)==5):
 			if("exactly" in args[2] or "at least" in args[2] or "at most" in args[2]):
@@ -1216,72 +1239,6 @@ class CheckTransformer(Transformer):
 			if(args[2][-2]==","):
 				args[2]=args[2][:-2]
 		return f"with {self.statement} {args[1]}, {args[2]}).guess("+"{"+f"{cond}"+"}"+f", {args[3]}"+")"+"\n"
-	def with_statement(self, var, conditions):
-		found=False
-		dependencies=[]
-		already_defined=[]
-		for i in range(0, len(conditions)-2, 3):
-			if(var[2]==conditions[i]):
-				verify=conditions[i+1].split("=")[0]
-				if("." in verify): #per trasformare ad es a.user.video=v in Assign(user=User(video=v)))
-					if conditions==self.define_condition:
-						conditions[i+1]=self.new_define_cond(verify, conditions[i+1])
-					else:
-						conditions[i+1]=self.new_guess_cond(verify, conditions[i+1]) 
-					verify=verify.split(".")[0]
-				if(verify.strip() in already_defined):
-					raise ValueError(f"Keyword argument repeated: {verify}")
-				already_defined.append(verify.strip())
-				if("." in conditions[i+2]):
-					conditions[i+2]=conditions[i+2].split(".")[0]
-				dependencies.append(f"as {conditions[i+2]}")
-				if(found):
-					self.condition+=", "+conditions[i+1]
-				else:
-					found=True
-					self.condition+=f"{var[1]}({conditions[i+1]}"
-		if not found:
-			self.statement+=var[0]+", "
-		elif(all(dep in self.statement for dep in dependencies)):
-			self.statement+=f"{self.condition}) as {var[2]}, "
-		else:	
-			c=f"{self.condition}) as {var[2]}"
-			self.dep[c]=dependencies
-			self.all_condition.append(c)
-			self.condition=""
-		self.condition=""
-	def new_guess_cond(self, verify, cond):
-		c=3
-		new_cond=""
-		c2=0
-		verify2=verify
-		while("." in verify):
-			en=verify2.split(".")
-			new_cond+=en[c2].strip()+"="+self.attributes_guess_check(self.guess_condition_args[cond][0:c])	+"("	
-			c+=2
-			c2+=1
-			verify=".".join(en[c2:])
-		new_cond+=en[-1].strip()+"="+cond.split("=")[1]
-		for j in range(len(new_cond)):
-			if(new_cond[j]=="("):
-				new_cond+=")"
-		return new_cond
-	def new_define_cond(self, verify, cond):
-		c=3
-		new_cond=""
-		c2=0
-		verify2=verify
-		while("." in verify):
-			en=verify2.split(".")
-			new_cond+=en[c2].strip()+"="+self.attributes_check(self.define_condition_args[cond][0:c])	+"("	
-			c+=2
-			c2+=1
-			verify=".".join(en[c2:])
-		new_cond+=en[-1].strip()+"="+cond.split("=")[1]
-		for j in range(len(new_cond)):
-			if(new_cond[j]=="("):
-				new_cond+=")"
-		return new_cond
 	def guess_definitions(self, args):
 		return self.print_stat(args)
 	def guess_definition(self, args):
@@ -1349,13 +1306,17 @@ class CheckTransformer(Transformer):
 			alias=self.add_number_guess(args[1])
 			self.new_guess_alias[args[1]]=alias
 			self.guess_alias[args[1]]=args[0]
-			if(negated):
+			if(negated):	
+				self.negated[alias]={}
+				self.negated[alias]=self.build_nested_dictionary(alias, args)
 				self.negated_atoms.append(alias)
 			return f"{args[0]}() as {alias}"
 		alias=self.number_guess(args[0])
 		self.new_guess_alias[args[0]]=alias
 		self.guess_records.add(args[0])
 		if(negated):
+			self.negated[alias]={}
+			self.negated[alias]=self.build_nested_dictionary(alias, args)
 			self.negated_atoms.append(alias)
 		return f"{args[0]}() as {alias}"
 	def guess_times(self, args):
@@ -1399,6 +1360,8 @@ class CheckTransformer(Transformer):
 			self.guess_alias[args[1]]=args[0]
 			self.new_guess_alias[args[1]]=alias
 			if negated:
+				self.negated[alias]={}
+				self.negated[alias]=self.build_nested_dictionary(alias, args)
 				self.negated_atoms.append(alias)
 			return f"{args[0]}() as {alias}"
 		alias=self.number_guess(args[0])
@@ -1407,6 +1370,8 @@ class CheckTransformer(Transformer):
 		self.guess_records.add(args[0])
 		self.new_guess_alias[args[0]]=alias
 		if negated:
+			self.negated[alias]={}
+			self.negated[alias]=self.build_nested_dictionary(alias, args)
 			self.negated_atoms.append(alias)
 		return f"{args[0]}() as {alias}"
 	def remove_and(self,args):
@@ -1422,6 +1387,19 @@ class CheckTransformer(Transformer):
 			if(args[i]!=""):
 				statements+=args[i]
 		return statements
+	def check_negated_atoms(self, args):
+		for neg in self.negated_atoms:
+			arg=""
+			if(neg in args[0]):
+				arg=args[0]
+			elif(neg in args[-1]):
+				arg=args[-1]
+			if(arg!=""): 
+				pattern=re.compile(r'{}((?:\.[a-zA-Z0-9_]+)+)'.format(re.escape(neg)))
+				match = pattern.search(arg)
+				if match:
+					terms = match.group(1).split('.')
+					self.access_nested_dict(self.negated[neg], terms[1:])
 	def guess_where(self, args):
 		statements=self.remove_and(args)
 		return "/"+ statements+"\\"
@@ -1451,23 +1429,17 @@ class CheckTransformer(Transformer):
 			args[0]=self.new_guess_alias[args[0]]
 		elif(args[0] in guess_alias[self.count_guess].keys()):
 			args[0]=guess_alias[self.count_guess][args[0]]
+		if(self.negated_atoms!=[]):
+			self.check_negated_atoms(args)
 		if(attribute!="str" and attribute!="int" and attribute!="any"):
-			point_split=splitted[0].split(".")
-			new_args=[]
-			for p in point_split:
-				new_args.append(p)
-				new_args.append(".")
-			new_args.pop()
-			new_args.append(args[1])
-			new_args.append(args[2])
-			op=new_args[-2]
-			return "Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{op}"+"{"+f"{types[0]}"+"}\")), True)"
+			return "Literal(Atom(Predicate(f\"{"+f"{args[0]}"+"}"+f"{args[-2]}"+"{"+f"{types[0]}"+"}\")), True)"
 		args[-1]=types[0]
 		return args		
 	def assert_statement(self, args):
 		return args[0]
 	def assert_1(self,args):
-		self.check_statement(args)
+		self.statement=""
+		self.find_pattern(args)
 		self.init_define_variables()
 		if(len(args)>2):
 			return f"with {self.statement}:\n	problem{self.problem}+={args[2]}"
@@ -1520,39 +1492,21 @@ class CheckTransformer(Transformer):
 		end_assert="Assert("+var_statement+").when("+args[1]+")"
 		return  f"with {self.statement}:\n	problem{self.problem}+={end_assert}"
 	def assert_(self, args):
-		return args[0]+"\n"
+		return self.negated_atoms_check(args)+"\n"
 	def deny_(self, args):
-		return args[0]+"\n"
+		return self.negated_atoms_check(args)+"\n"
 	def find_pattern(self, args):
 		pattern = r'(([A-Z][a-zA-Z0-9_]*)\(\) as\s+([a-z_][a-zA-Z0-9_]*))(?:\s|,|$)'
-		self.dep={}
-		self.condition=""
-		self.all_condition=[]
 		match = re.findall(pattern, args[0])
 		if match:
 			for var in match:
-				self.with_statement(var, self.define_condition)
+				self.statement+=var[0]+", "
 		if(len(args)>2):
 			match = re.findall(pattern, args[1])
 			if match:
 				for var in match:
-					self.with_statement(var, self.define_condition)
-		length=len(self.all_condition)
-		while(len(self.all_condition)>0):
-			for c in self.all_condition:
-				if(all(d in self.statement for d in self.dep[c])):
-					self.statement+=c+", "
-					self.all_condition.remove(c)
-					break
-			if(len(self.all_condition)==length):
-				raise ValueError("Circular dependencies detected")
-			else:
-				length-=1
+					self.statement+=var[0]+", "
 		self.statement=self.statement[:-2]
-	def check_statement(self, args):
-		self.statement=""
-		self.find_pattern(args)
-		self.define_condition=[]
 	def init_define_variables(self):
 		self.redefined_record={}
 		self.defined_record=set()
@@ -1572,7 +1526,6 @@ class CheckTransformer(Transformer):
 		for aggr in self.aggregate_with:
 			args[0]+=", "+aggr
 		self.find_pattern(args)
-		self.define_condition=[]
 	def assert_definition(self, args):
 		return self.print_stat(args)
 	def assert_records(self,args):
@@ -1629,7 +1582,8 @@ class CheckTransformer(Transformer):
 	def assert_otherwise(self, args):
 		return args[0]
 	def assert_otherwise_1(self, args):
-		self.check_statement(args)
+		self.statement=""
+		self.find_pattern(args)
 		if(len(args)>2):
 			return f"with {self.statement}:\n	problem{self.problem}+={args[2]}"
 		return f"with {self.statement}:\n	problem{self.problem}+={args[1]}"
@@ -1707,8 +1661,16 @@ class CheckTransformer(Transformer):
 		for i in range(len(args)):
 			stat+=args[i]
 		return stat
+	def find_false_keys(self, dictionary, prefisso=''):
+		keys_false = []
+		for chiave, valore in dictionary.items():
+			if isinstance(valore, dict):
+				keys_false.extend(self.find_false_keys(valore, prefisso + chiave + '.'))
+			elif valore is False:
+				keys_false.append(prefisso + chiave)
+		return keys_false
 	def deny(self, args):
-		return args[0]
+		return self.negated_atoms_check(args)
 	def deny_1(self, args):
 		if(len(args)==3):
 			temp=args[2]
@@ -1870,6 +1832,9 @@ def check_graph():
 	global g
 	g.SCC()
 
+def print_program():
+	return f"\nprint(problem{number})\n"
+
 def execute(solver_path):
 	asp=""
 	if(asp_block!=""):
@@ -1905,13 +1870,14 @@ def main():
 	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
 	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
 	parser.add_option("-e", "--execute", dest="execute", help="execute the generated code")
-	parser.add_option("-r", "--disable-recursive", dest="recursive", default=False, help="disable recursive checking")
+	parser.add_option("-r", "--disable-recursive-check", dest="recursive", default=False, help="disable recursive checking", action="store_true")
+	parser.add_option("-p", "--print-program", dest="print_program", default=False, help="print ASP program", action="store_true")
 	(options, args) = parser.parse_args()
 	code = ''.join(fileinput.input(args))
 	try:
 		global recursive
-		if(options.recursive):
-			recursive=True
+		if options.recursive:
+			recursive = True
 		tree = build_tree(code)
 		if recursive:
 			check_graph()
@@ -1921,20 +1887,24 @@ def main():
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
 		f.write(str(tree))
+		has_to_close = True
+		if options.print_program:
+			f.write(print_program())
+			if options.execute is None:
+				f.close()
+				subprocess.run(["python", f"{destination_file}"])
 		if options.execute is not None:
 			execution_string=execute(str(options.execute))
 			if options.verbose:
 				print(execution_string)
 			f.write(execution_string)
 			f.close()
-			subprocess.run(["python", f"{destination_file}"])
-		else:
-			f.close()
+			subprocess.run(["python", f"{destination_file}"])	
+		f.close()
 	except exceptions.LarkError as e:
 		print(f"Parsing error: {e}")
 	except Exception as e:
 		print(f"Unexpected error: {e}")
-
 
 if __name__ == '__main__':
 	main()
