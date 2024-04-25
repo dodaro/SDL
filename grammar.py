@@ -1899,19 +1899,23 @@ else:
 	"""
 	return execution_string
 
+def print_program():
+	return f"\nprint(problem{number})\n"
+
 def main():
 	destination_file = "o.py"
 	parser = OptionParser(usage="Usage: %prog [options] [input_files]")
 	parser.add_option("-f", "--file", dest="destination_file", help="write output to FILE", metavar="FILE")
 	parser.add_option("-v", "--verbose", action="store_true", default=False, dest="verbose", help="print parse tree")
 	parser.add_option("-e", "--execute", dest="execute", help="execute the generated code")
-	parser.add_option("-r", "--disable-recursive", dest="recursive", default=False, help="disable recursive checking")
+	parser.add_option("-r", "--disable-recursive-check", dest="recursive", default=False, help="disable recursive checking", action="store_true")
+	parser.add_option("-p", "--print-program", dest="print_program", default=False, help="print ASP program", action="store_true")
 	(options, args) = parser.parse_args()
 	code = ''.join(fileinput.input(args))
 	try:
 		global recursive
 		if(options.recursive):
-			recursive=True
+			recursive = True
 		tree = build_tree(code)
 		if recursive:
 			check_graph()
@@ -1921,8 +1925,13 @@ def main():
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
 		f.write(str(tree))
+		if options.print_program:
+			f.write(print_program())
+			if options.execute is None:
+				f.close()
+				subprocess.run(["python", f"{destination_file}"])
 		if options.execute is not None:
-			execution_string=execute(str(options.execute))
+			execution_string = execute(str(options.execute))
 			if options.verbose:
 				print(execution_string)
 			f.write(execution_string)
