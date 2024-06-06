@@ -1,0 +1,64 @@
+record Nurse: id: int;
+record Day: id: int;
+record Shift: id: int, hours: int;
+record HoursLimits: min: int, max: int;
+record DayLimits: shift: Shift, min: int, max: int;
+record NurseLimits: shift: Shift, min: int, max: int;
+record Assign: nurse: Nurse, shift: Shift, day: Day;
+
+show Assign;
+
+guess from Day, Nurse exactly 1
+	Assign from Shift
+        	where Assign.nurse == Nurse and Assign.shift == Shift and Assign.day == Day;
+
+deny from Day, NurseLimits
+	having count {
+        	Assign.nurse from Assign 
+                	where Assign.shift == NurseLimits.shift and Assign.day == Day
+	} > NurseLimits.max;
+
+
+deny from Day, NurseLimits
+	having count {
+		Assign.nurse from Assign 
+        		where Assign.shift == NurseLimits.shift and Assign.day == Day
+	} < NurseLimits.min;
+
+deny from Nurse, HoursLimits
+	having sum {
+      		Shift.hours, Assign.day from Assign, Shift 
+        		where Assign.nurse == Nurse and Assign.shift == Shift
+	} > HoursLimits.max;
+
+
+deny from Nurse, HoursLimits
+	having sum {
+		Shift.hours, Assign.day from Assign, Shift 
+        		where Assign.nurse == Nurse and Assign.shift == Shift
+	} < HoursLimits.min;
+
+deny from Nurse
+        having count {
+        	Assign.day from Assign 
+                	where Assign.nurse == Nurse and Assign.shift.id == 6
+        } != 30;
+    
+deny from Nurse, Assign as a1, Assign as a2
+	where a1.nurse == Nurse and a2.nurse == Nurse and a2.shift.id < a1.shift.id and a1.day.id == a2.day.id+1 and a2.shift.id <= 3 and a1.shift.id <= 3;
+
+deny from Nurse, Day
+	where Day.id <= 352
+	having count {
+       		Assign.day from Assign 
+     			where Assign.nurse == Nurse and Assign.shift.id == 5 and Assign.day.id >= Day.id and Assign.day.id < Day.id+14
+	} < 2;    
+
+deny from Assign as a1, Assign as a2, Assign as a3
+	where a1.nurse.id == a2.nurse.id and a1.nurse.id == a3.nurse.id and a1.shift.id == 4 and a2.shift.id == 3 and a3.shift.id == 3 and a2.day.id == a1.day.id-2 and a3.day.id == a1.day.id-1;
+   
+deny from Assign as a1, not Assign as a2
+	where a1.nurse == a2.nurse and a1.shift.id == 4 and a2.shift.id == 3 and a2.day.id == a1.day.id-2;
+
+deny from Assign as a1, not Assign as a2
+	where a1.nurse == a2.nurse and a1.shift.id == 4 and a2.shift.id == 3 and a2.day.id == a1.day.id-1;

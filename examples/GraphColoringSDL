@@ -1,0 +1,16 @@
+record Node: id: int;
+record Edge: first: Node, second: Node;
+record Color: value: str;
+record Assign: node: Node, color: Color;
+
+guess from Node
+	exactly 1 
+        Assign
+            from Color
+                where Assign.node == Node and Assign.color == Color;  
+
+deny from Assign as a1, Assign as a2, Edge
+	where a1.node != a2.node and a1.color == a2.color and 
+        	Edge.first == a1.node and Edge.second == a2.node;
+
+show Assign;

@@ -1,0 +1,32 @@
+record Node: id: int;
+record Arc: first: Node, second: Node;
+record InCycle: first: Node, second: Node;
+record Reached: node: Node;
+record Start: node: Node;
+
+guess from Node
+	exactly 1
+        InCycle
+        	from Arc
+                	where InCycle.first == Arc.first and 
+				InCycle.second == Arc.second and 
+                		Node == Arc.first;
+
+deny from Node
+	having count {InCycle.first from InCycle where Node == InCycle.second} != 1;
+
+define Reached 
+	from Start
+        	where Start.node == Reached.node;
+
+
+define Reached as r1
+	from Reached as r2, InCycle
+		where r2.node == InCycle.first and r1.node == InCycle.second;
+
+
+deny from Node, not Reached
+	where Node == Reached.node;
+
+
+show InCycle;
