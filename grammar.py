@@ -1924,8 +1924,6 @@ def main():
 			if options.print_program:
 				asp=""
 			execution_string=execute(str(options.execute), asp)
-			if options.verbose:
-				print(execution_string)
 			f.write(execution_string)
 			f.close()
 			subprocess.run(["python", f"{destination_file}"])	
