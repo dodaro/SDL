@@ -113,18 +113,20 @@ grammar = """
 	deny_record: NOT? RECORD_NAME ("as" NAME)?
 	where_deny: "where" where_deny_statement (AND where_deny_statement)*
 	where_deny_statement: var_expression operator var_expression
-	try_assert: assert_otherwise "or" pay_statement SEMICOLON
-	assert_otherwise: assert_otherwise_1 | assert_otherwise_2 | assert_otherwise_3
+	try_assert: assert_otherwise "otherwise" pay_statement SEMICOLON
+	assert_otherwise: assert_otherwise_1 | assert_otherwise_2 | assert_otherwise_3 | assert_otherwise_4
 	assert_otherwise_1: assert_definition assert_from? where_assert
 	assert_otherwise_2: assert_definition assert_from? where_assert aggregate
 	assert_otherwise_3: assert_definition assert_from? aggregate
+	assert_otherwise_4: assert_definition
 	pay_statement: "pay" arithmetic_operation "at" arithmetic_operation
 	try_deny: deny_otherwise "or" pay_statement SEMICOLON
-	deny_otherwise: deny_otherwise_1 | deny_otherwise_2
+	deny_otherwise: deny_otherwise_1 | deny_otherwise_2 | deny_otherwise_3
 	deny_otherwise_1: "deny" deny_from where_deny aggregate?
 	deny_otherwise_2: "deny" deny_from aggregate
+	deny_otherwise_3: "deny" deny_from
 	pay: (NAME | RECORD_NAME) (DOT NAME)+
-	arithmetic_operation: (pay | INT) | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
+	arithmetic_operation: (pay | INT) | (PLUS | MINUS | TIMES | DIVIDED_BY) INT | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
 	guess_aggregate: "having" aggr_def_guess (AND aggr_def_guess)*
 	aggr_def_guess: (COUNT | SUM_OF | MIN | MAX) "{" aggr_body_guess (SEMICOLON aggr_body_guess)* "}" operator aggregate_term_guess_exp
 	aggr_body_guess: aggr_body_guess1 | aggr_body_guess2
@@ -1622,6 +1624,15 @@ class CheckTransformer(Transformer):
 			return f"with {self.statement}:\n	problem{self.problem}+={end_assert}"
 		end_assert="Assert("+var_statement+").when("+args[1]+")"
 		return  f"with {self.statement}:\n	problem{self.problem}+={end_assert}"
+	def assert_otherwise_4(self, args):
+		self.assert_deny_with(args)
+		end_assert=""
+		var=self.assert_stat()
+		var_statement=f"{var[0]}"
+		for i in range(1, len(var)):
+			var_statement+=f", {var[i]}"
+		end_assert="Assert("+var_statement+")"
+		return  f"with {self.statement}:\n	problem{self.problem}+={end_assert}"
 	def pay_statement(self, args):
 		return args[0]+","+args[1]+","
 	def try_deny(self, args):
@@ -1648,6 +1659,17 @@ class CheckTransformer(Transformer):
 					pre_statement+="~"
 				pre_statement+=alias+", "
 		return f"with {self.statement}:\n	problem{self.problem}+=Assert(False).when("+pre_statement+f"{args[1]})"
+	def deny_otherwise_3(self, args):
+		self.assert_deny_with(args)
+		pre_statement=""
+		for alias in self.new_define_alias.values():
+			if not alias in self.aggr_new_alias:
+				if(alias in self.negated_atoms):
+					pre_statement+="~"
+				pre_statement+=alias+", "
+		if(pre_statement[-2]==","):
+			pre_statement=pre_statement[:-2]
+		return f"with {self.statement}:\n	problem{self.problem}+=Assert(False).when("+pre_statement+")"
 	def pay(self, args):
 		if(args[0] in self.aggr_alias):
 			raise ValueError(f"{args[0]} is not defined")
@@ -1835,7 +1857,11 @@ def check_graph():
 	g.SCC()
 
 def print_program():
-	return f"\nprint(problem{number})\n"
+	asp=""
+	if(asp_block!=""):
+		asp+=f"""\nproblem{number}.add(\"\"\"{asp_block}\"\"\")"""
+	asp+=f"\nprint(problem{number})\n"
+	return asp
 
 def execute(solver_path):
 	asp=""
@@ -1885,6 +1911,8 @@ def main():
 			check_graph()
 		if options.verbose:
 			print(tree)
+			if(asp_block!=""):
+				print(f"""problem{number}.add(\"\"\"{asp_block}\"\"\")""")
 		if options.destination_file is not None:
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
