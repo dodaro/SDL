@@ -86,7 +86,7 @@ grammar = """
 	where_guess: "where"  where_guess_statement (AND where_guess_statement)*
 	where_guess_statement: var_guess_exp (operator var_guess_exp)
 	guess_times: times times_exp (AND guess_times)*
-	times_exp: (INT| times_value) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
+	times_exp: (INT| times_value | range2) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
 	guess_definitions: guess_definition+
 	guess_definition: RECORD_NAME ("as" NAME)? guess_declaration
 	guess_declaration: guess_from? guess_where
@@ -126,7 +126,7 @@ grammar = """
 	deny_otherwise_2: "deny" deny_from aggregate
 	deny_otherwise_3: "deny" deny_from
 	pay: (NAME | RECORD_NAME) (DOT NAME)+
-	arithmetic_operation: (pay | INT) | (PLUS | MINUS | TIMES | DIVIDED_BY) INT | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
+	arithmetic_operation: (pay | INT | range2) | (PLUS | MINUS | TIMES | DIVIDED_BY) INT | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
 	guess_aggregate: "having" aggr_def_guess (AND aggr_def_guess)*
 	aggr_def_guess: (COUNT | SUM_OF | MIN | MAX) "{" aggr_body_guess (SEMICOLON aggr_body_guess)* "}" operator aggregate_term_guess_exp
 	aggr_body_guess: aggr_body_guess1 | aggr_body_guess2
@@ -156,22 +156,24 @@ grammar = """
 	aggregate_expression: (aggregate_record|INT) | aggregate_expression (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_expression | OB aggregate_expression CB
 	aggregate_record: (NAME | RECORD_NAME) (DOT NAME)* 
 	aggregate_term_exp: aggregate_term | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
-	aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT
+	aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT | range
 	var_guess_exp: var_guess | var_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp | OB var_guess_exp CB
 	asp: /[^$]+/
-	var_guess:  INT | STR | value_guess
+	var_guess:  INT | STR | value_guess | range
 	value_guess: (NAME | RECORD_NAME) (DOT NAME)*
 	times_value: (NAME | RECORD_NAME) (DOT NAME)+
 	value: (NAME | RECORD_NAME) (DOT NAME)*
 	var_guess_exp_2: var_guess_2  | var_guess_exp_2 (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp_2 | OB var_guess_exp_2 CB
-	var_guess_2:  INT | STR | value_guess_2
-	var: INT | STR | value
+	var_guess_2:  INT | STR | value_guess_2 | range
+	var: INT | STR | value | range
 	value_guess_2: (NAME | RECORD_NAME) (DOT NAME)*	
-	var_define: INT | STR | value_define
+	var_define: INT | STR | value_define | range
+	range: INT DOT DOT INT
+	range2: range
 	aggr_guess_exp: var_aggr_guess | aggr_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggr_guess_exp | OB aggr_guess_exp CB
 	exp_aggr_define: var_aggr_define | exp_aggr_define (PLUS | MINUS | TIMES | DIVIDED_BY) exp_aggr_define | OB exp_aggr_define CB
-	var_aggr_define: INT | STR | value_aggr_define
-	var_aggr_guess: INT | STR | value_aggr_guess
+	var_aggr_define: INT | STR | value_aggr_define | range
+	var_aggr_guess: INT | STR | value_aggr_guess | range
 	value_aggr_define: (NAME | RECORD_NAME) (DOT NAME)*	
 	value_aggr_guess: (NAME | RECORD_NAME) (DOT NAME)*	
 	value_define: (NAME | RECORD_NAME) (DOT NAME)*	
@@ -707,6 +709,11 @@ class CheckTransformer(Transformer):
 			if(not args[0] in self.declared_alias.keys()and not args[0] in self.defined_records):
 					raise ValueError(f"{args[0]} is not defined")
 		return self.value_def(args)
+	def range(self, args):
+		return f"domain({args[0]}, {args[3]})/int"
+	def range2(self, args):
+		splitted=args[0].split("/")
+		return splitted[0]
 	def var_guess_exp(self,args):
 		return self.exp_aggr_define(args)
 	def aggr_guess_exp(self, args):
@@ -1017,7 +1024,10 @@ class CheckTransformer(Transformer):
 		if(not types[1]=="int"):
 			raise ValueError(f"Expected int, received {types[1]}: {types[0]}")
 		return types[0]
-	def aggregate_term(self, args):
+	def aggregate_term(self, args):	
+		splitted=args[0].split("/")
+		if(len(splitted)>1):
+			return splitted[0]
 		if(args[0].type=="INT"):
 			return args[0]
 		return self.pay(args)
