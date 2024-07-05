@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "SDL"
+version = "0.0.1"
+description = "Structured Declarative Language"
+authors = ["Mario Alviano <mario.alviano@gmail.com>", "Carmine Dodaro", "Ilaria Raffaela Vasile"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+lark = "^1.1.9"
+pyspel = "^1.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
