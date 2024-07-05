@@ -1738,6 +1738,8 @@ class CheckTransformer(Transformer):
 			raise ValueError(f"Operator {"".join(args)} is not supported.")
 		return "".join(args)
 	def op(self, args):
+		if(args[0]=="="):
+			args[0]="=="
 		return args[0]
 	def times(self, args):
 		return args[0]+"="
@@ -1864,9 +1866,6 @@ else:
 	"""
 	return execution_string
 
-def print_program():
-	return f"\nprint(problem{number})\n"
-
 def main():
 	destination_file = "o.py"
 	parser = OptionParser(usage="Usage: %prog [options] [input_files]")
@@ -1890,13 +1889,14 @@ def main():
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
 		f.write(str(tree))
+		has_to_close = True
 		if options.print_program:
 			f.write(print_program())
 			if options.execute is None:
 				f.close()
 				subprocess.run(["python", f"{destination_file}"])
 		if options.execute is not None:
-			execution_string = execute(str(options.execute))
+			execution_string=execute(str(options.execute))
 			if options.verbose:
 				print(execution_string)
 			f.write(execution_string)
