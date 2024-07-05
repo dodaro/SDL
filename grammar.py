@@ -1856,17 +1856,11 @@ def check_graph():
 	global g
 	g.SCC()
 
-def print_program():
-	asp=""
-	if(asp_block!=""):
-		asp+=f"""\nproblem{number}.add(\"\"\"{asp_block}\"\"\")"""
+def print_program(asp):
 	asp+=f"\nprint(problem{number})\n"
 	return asp
 
-def execute(solver_path):
-	asp=""
-	if(asp_block!=""):
-		asp+=f"""problem{number}.add(\"\"\"{asp_block}\"\"\")"""
+def execute(solver_path, asp):
 	execution_string = asp+f"""
 solver = SolverWrapper(solver_path="{solver_path}")
 res = solver.solve(problem=problem{number}, timeout=10)
@@ -1909,22 +1903,27 @@ def main():
 		tree = build_tree(code)
 		if recursive:
 			check_graph()
+		asp=""
+		if(asp_block!=""):
+			asp+=f"""problem{number}.add(\"\"\"{asp_block}\"\"\")"""
 		if options.verbose:
 			print(tree)
-			if(asp_block!=""):
-				print(f"""problem{number}.add(\"\"\"{asp_block}\"\"\")""")
+			if(asp!=""):
+				print(asp)
 		if options.destination_file is not None:
 			destination_file = options.destination_file
 		f = open(f"{destination_file}", "w")
 		f.write(str(tree))
 		has_to_close = True
 		if options.print_program:
-			f.write(print_program())
+			f.write(print_program(asp))
 			if options.execute is None:
 				f.close()
 				subprocess.run(["python", f"{destination_file}"])
 		if options.execute is not None:
-			execution_string=execute(str(options.execute))
+			if options.print_program:
+				asp=""
+			execution_string=execute(str(options.execute), asp)
 			if options.verbose:
 				print(execution_string)
 			f.write(execution_string)
