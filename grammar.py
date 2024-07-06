@@ -1795,7 +1795,8 @@ class CheckTransformer(Transformer):
 
     def operator(self, args):
         if len(args) > 1:
-            raise ValueError(f"Operator {"".join(args)} is not supported.")
+            my_str = "".join(args)
+            raise ValueError(f"Operator {my_str} is not supported.")
         return "".join(args)
 
     def op(self, args):
