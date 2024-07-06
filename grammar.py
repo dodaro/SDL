@@ -86,7 +86,7 @@ grammar = """
 	where_guess: "where"  where_guess_statement (AND where_guess_statement)*
 	where_guess_statement: var_guess_exp (operator var_guess_exp)
 	guess_times: times times_exp (AND guess_times)*
-	times_exp: (INT| times_value | range2) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
+	times_exp: (INT| times_value | range_times) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
 	guess_definitions: guess_definition+
 	guess_definition: RECORD_NAME ("as" NAME)? guess_declaration
 	guess_declaration: guess_from? guess_where
@@ -155,25 +155,32 @@ grammar = """
 	var_expression: var | var_expression (PLUS | MINUS | TIMES | DIVIDED_BY) var_expression | OB var_expression CB
 	aggregate_expression: (aggregate_record|INT) | aggregate_expression (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_expression | OB aggregate_expression CB
 	aggregate_record: (NAME | RECORD_NAME) (DOT NAME)* 
-	aggregate_term_exp: aggregate_term | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
-	aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT | range
+	aggregate_term_exp: aggregate_terms | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
+	aggregate_terms: aggregate_term (".." aggregate_term)?
+	aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT
 	var_guess_exp: var_guess | var_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp | OB var_guess_exp CB
 	asp: /[^$]+/
-	var_guess:  INT | STR | value_guess | range
+	var_guess:  INT | STR | value_guess | range_guess
+	range_guess: (INT|value_guess) ".." (INT| value_guess)
 	value_guess: (NAME | RECORD_NAME) (DOT NAME)*
+	range_times: (INT| times_value) ".." (INT|times_value)
 	times_value: (NAME | RECORD_NAME) (DOT NAME)+
 	value: (NAME | RECORD_NAME) (DOT NAME)*
 	var_guess_exp_2: var_guess_2  | var_guess_exp_2 (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp_2 | OB var_guess_exp_2 CB
-	var_guess_2:  INT | STR | value_guess_2 | range
-	var: INT | STR | value | range
+	var_guess_2:  INT | STR | value_guess_2 | range_guess_2
+	range_guess_2: (INT|value_guess_2) ".." (INT| value_guess_2)
+	var: INT | STR | value | range_var
+	range_var: (INT|value) ".." (INT| value)
 	value_guess_2: (NAME | RECORD_NAME) (DOT NAME)*	
-	var_define: INT | STR | value_define | range
-	range: INT DOT DOT INT
-	range2: range
+	var_define: INT | STR | value_define | range_define
+	range_define: (INT|value_define) ".." (INT|value_define)
+	range2: (pay | INT) ".." (pay | INT)
 	aggr_guess_exp: var_aggr_guess | aggr_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggr_guess_exp | OB aggr_guess_exp CB
 	exp_aggr_define: var_aggr_define | exp_aggr_define (PLUS | MINUS | TIMES | DIVIDED_BY) exp_aggr_define | OB exp_aggr_define CB
-	var_aggr_define: INT | STR | value_aggr_define | range
-	var_aggr_guess: INT | STR | value_aggr_guess | range
+	var_aggr_define: INT | STR | value_aggr_define | range_aggr_define
+	range_aggr_define: (INT|value_aggr_define) ".." (INT|value_aggr_define)
+	var_aggr_guess: INT | STR | value_aggr_guess | range_aggr_guess
+	range_aggr_guess: (INT|value_aggr_guess) ".." (INT|value_aggr_guess)
 	value_aggr_define: (NAME | RECORD_NAME) (DOT NAME)*	
 	value_aggr_guess: (NAME | RECORD_NAME) (DOT NAME)*	
 	value_define: (NAME | RECORD_NAME) (DOT NAME)*	
@@ -588,6 +595,8 @@ class CheckTransformer(Transformer):
 		return self.define_expression(args)
 	def var(self, args):
 		return self.var_define(args)
+	def range_var(self, args):
+		return self.range_define(args)
 	def value(self, args):
 		statement=""
 		record=args[0]
@@ -649,6 +658,17 @@ class CheckTransformer(Transformer):
 				args[0]=f"'{args[0]}'"
 			args[0]+=f"/{type_value}"
 		return self.print_stat(args)
+	def verify_int(self, arg):
+		splitted=arg.split("/")
+		if(len(splitted)>1):
+			if(splitted[1]!="int"):
+				raise ValueError(f"Expected int, received: {splitted[1]}")
+			return splitted[0]
+		return arg
+	def range_define(self, args):
+		args[0]=self.verify_int(args[0])
+		args[1]=self.verify_int(args[1])
+		return f"domain({args[0]}, {args[1]})/int"
 	def exp_aggr_define(self, args):
 		stat=""
 		operators=["*","+","-","$"]
@@ -691,6 +711,8 @@ class CheckTransformer(Transformer):
 		return stat
 	def var_aggr_define(self, args):
 		return self.var_define(args)
+	def range_aggr_define(self, args):
+		return self.range_define(args)
 	def value_def(self, args):
 		statement=""
 		record=args[0]
@@ -712,20 +734,23 @@ class CheckTransformer(Transformer):
 	def range(self, args):
 		return f"domain({args[0]}, {args[3]})/int"
 	def range2(self, args):
-		splitted=args[0].split("/")
-		return splitted[0]
+		return self.range_times(args)
 	def var_guess_exp(self,args):
 		return self.exp_aggr_define(args)
 	def aggr_guess_exp(self, args):
 		return self.exp_aggr_define(args)
 	def var_aggr_guess(self, args):
 		return self.var_define(args)
+	def range_aggr_guess(self, args):
+		return self.range_define(args)
 	def value_aggr_guess(self, args):
 		if(not args[0] in guess_records[self.count_guess].keys() and not args[0] in self.aggr_guess_record):
 			raise ValueError(f"{args[0]} is not defined")
 		return self.value_guess_check(args)
 	def var_guess(self, args):
 		return self.var_define(args)
+	def range_guess(self, args):
+		return self.range_define(args)
 	def value_guess(self, args):
 		if(not args[0] in guess_records[self.count_guess].keys()):
 			raise ValueError(f"{args[0]} is not defined")
@@ -750,6 +775,10 @@ class CheckTransformer(Transformer):
 				args[i]="$"
 			stat+=args[i]
 		return stat
+	def range_times(self, args):
+		args[0]=self.verify_int(args[0])
+		args[1]=self.verify_int(args[1])
+		return f"domain({args[0]}, {args[1]})"
 	def times_value(self, args):
 		statement=""
 		if not (args[0] in  guess_records[self.count_guess].keys()):
@@ -768,6 +797,8 @@ class CheckTransformer(Transformer):
 		return self.exp_aggr_define(args)
 	def var_guess_2(self, args):
 		return self.var_define(args)
+	def range_guess_2(self, args):
+		return self.range_define(args)
 	def value_guess_2(self, args):
 		if not (args[0] in self.guess_alias.keys() or args[0] in self.guess_records or args[0] in guess_records[self.count_guess].keys()):
 			raise ValueError(f"{args[0]} is not defined")
@@ -1024,6 +1055,10 @@ class CheckTransformer(Transformer):
 		if(not types[1]=="int"):
 			raise ValueError(f"Expected int, received {types[1]}: {types[0]}")
 		return types[0]
+	def aggregate_terms(self, args):
+		if(len(args)>1):
+			return self.range_times(args)
+		return args[0]
 	def aggregate_term(self, args):	
 		splitted=args[0].split("/")
 		if(len(splitted)>1):
