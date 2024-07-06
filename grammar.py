@@ -84,14 +84,14 @@ class DeclarationTransformer(Transformer):
         record_name = args[0]
         declarations = args[2].children
         if record_name in records.keys():
-            raise ValueError(f"Record already defined: {record_name}")
+            raise ValueError(error_messages.record_defined(record_name))
         records[record_name] = []
         for i in range(0, len(declarations), 2):
             attr = declarations[i].children
             token = attr[2].children
             attr_type = token[0]
             if attr_type == record_name:
-                raise ValueError("Recursive dependencies between records")
+                raise ValueError(error_messages.RECURSIVE_DEPENDENCY_BETWEEN_RECORDS)
             attr[0].type = str(attr_type)
             records[record_name].append(attr[0])
         return args
@@ -106,12 +106,12 @@ class DeclarationTransformer(Transformer):
     def guess_definition(self, args):
         if len(args) >= 3:
             if args[1] in guess_records[self.count_guess].keys():
-                raise ValueError(f"Alias already defined: {args[1]}")
+                raise ValueError(error_messages.alias_defined(args[1]))
             guess_alias[self.count_guess][args[1]] = self.add_number(args[1])
             guess_records[self.count_guess][args[1]] = args[0]
         else:
             if args[0] in guess_records[self.count_guess].keys():
-                raise ValueError(f"Record already defined: {args[0]}")
+                raise ValueError(error_messages.record_defined(args[0]))
             guess_alias[self.count_guess][args[0]] = self.number(args[0])
             guess_records[self.count_guess][args[0]] = args[0]
         guess_alias[self.count_guess]["number"] += 1
@@ -122,12 +122,12 @@ class DeclarationTransformer(Transformer):
             index = 1
         if len(args) > index + 1:
             if args[index + 1] in guess_records[self.count_guess].keys():
-                raise ValueError(f"Alias already defined: {args[index + 1]}")
+                raise ValueError(error_messages.alias_defined(args[index + 1]))
             guess_records[self.count_guess][args[index + 1]] = args[index]
             guess[self.count_guess].append(args[index + 1])
         else:
             if args[index] in guess_records[self.count_guess].keys():
-                raise ValueError(f"Record already defined: {args[index]}")
+                raise ValueError(error_messages.record_defined(args[index]))
             guess_records[self.count_guess][args[index]] = args[index]
             guess[self.count_guess].append(args[index])
 
@@ -137,10 +137,10 @@ class DeclarationTransformer(Transformer):
             index = 1
         if len(args) > index + 1:
             if args[index + 1] in guess_records[self.count_guess].keys():
-                raise ValueError(f"Alias already defined: {args[index + 1]}")
+                raise ValueError(error_messages.alias_defined(args[index + 1]))
         else:
             if args[index] in guess_records[self.count_guess].keys():
-                raise ValueError(f"Record already defined: {args[index]}")
+                raise ValueError(error_messages.record_defined(args[index]))
 
     def number(self, args):
         letter = args[0].lower()
@@ -204,7 +204,7 @@ class CheckTransformer(Transformer):
                             ordered.append(atom)
                             ordered_atoms.append(name)
             if len(ordered) == length:
-                raise ValueError("Circular dependencies detected between records")
+                raise ValueError(error_messages.RECURSIVE_DEPENDENCY_BETWEEN_RECORDS)
             else:
                 length += 1
         ordered.append(f"\nproblem{self.problem} = Problem()\n\n")
@@ -262,7 +262,7 @@ class CheckTransformer(Transformer):
         for attr in attr_list:
             if attr.type != "int" and attr.type != "any" and attr.type != "str":
                 if attr.type == args:
-                    raise ValueError("Recursive dependencies between records")
+                    raise ValueError(error_messages.RECURSIVE_DEPENDENCY_BETWEEN_RECORDS)
                 verify_list.append(attr.type)
         return verify_list
 
@@ -346,7 +346,7 @@ class CheckTransformer(Transformer):
             if "()" in arg:
                 pred = arg.split("()")[0]
                 if recursive and pred == pred_define:
-                    raise ValueError("Cyclic dependency detected")
+                    raise ValueError(error_messages.CYCLIC_DEPENDENCY)
                 self.increment_num(pred)
                 g.add_edge(num_pred[pred], num_pred[pred_define])
 
@@ -361,7 +361,7 @@ class CheckTransformer(Transformer):
             else:
                 en = split
             if recursive and en == pred_guess:
-                raise ValueError("Cyclic dependency detected")
+                raise ValueError(error_messages.CYCLIC_DEPENDENCY)
             self.increment_num(en)
             g.add_edge(num_pred[en], num_pred[pred_guess])
 
@@ -392,7 +392,7 @@ class CheckTransformer(Transformer):
         self.declared_alias = {}
         self.defined_records = set()
         if not args[0] in records.keys():
-            raise ValueError(f"Undefined record: {args[0]}")
+            raise ValueError(error_messages.undefined_record(args[0]))
         self.attributes = {}
         attr = records[args[0]]
         all_attr = []
@@ -429,16 +429,16 @@ class CheckTransformer(Transformer):
             negated = True
             args = args[1:]
         if not args[0] in records.keys():
-            raise ValueError(f"Undefined record: {args[0]}")
+            raise ValueError(error_messages.undefined_record(args[0]))
         ""
         if len(args) > 1:
             if args[1] in self.declared_alias or args[1] in self.redefined_record.keys():
-                raise ValueError(f"Alias already defined: {args[1]}")
+                raise ValueError(error_messages.alias_defined(args[1]))
             self.declared_alias[args[1]] = args[0]
             var = args[1]
         else:
             if args[0] in self.defined_records or args[0] in self.defined_record:
-                raise ValueError(f"Record already defined: {args[0]}")
+                raise ValueError(error_messages.record_defined(args[0]))
             self.defined_records.add(args[0])
             var = args[0]
         attr = records[args[0]]
@@ -475,7 +475,7 @@ class CheckTransformer(Transformer):
         statement = ""
         if not (args[0] in self.defined_record or args[0] in self.redefined_record.keys()):
             if not args[0] in self.declared_alias.keys() and not args[0] in self.defined_records:
-                raise ValueError(f"{args[0]} is not defined")
+                raise ValueError(error_messages.undefined_element(args[0]))
         attribute = self.attributes_check(args)
         if args[0] in self.new_define_alias.keys():
             args[0] = self.new_define_alias[args[0]]
@@ -605,13 +605,13 @@ class CheckTransformer(Transformer):
 
     def value_aggr_define(self, args):
         if not args[0] in self.declared_alias.keys() and not args[0] in self.defined_records:
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_element(args[0]))
         return self.value_def(args)
 
     def value_define(self, args):
         if not (args[0] in self.redefined_record.keys() or args[0] in self.defined_record):
             if not args[0] in self.declared_alias.keys() and not args[0] in self.defined_records:
-                raise ValueError(f"{args[0]} is not defined")
+                raise ValueError(error_messages.undefined_element(args[0]))
         return self.value_def(args)
 
     def range(self, args):
@@ -634,7 +634,7 @@ class CheckTransformer(Transformer):
 
     def value_aggr_guess(self, args):
         if not args[0] in guess_records[self.count_guess].keys() and not args[0] in self.aggr_guess_record:
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_element(args[0]))
         return self.value_guess_check(args)
 
     def var_guess(self, args):
@@ -645,7 +645,7 @@ class CheckTransformer(Transformer):
 
     def value_guess(self, args):
         if not args[0] in guess_records[self.count_guess].keys():
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_element(args[0]))
         return self.value_guess_check(args)
 
     def value_guess_check(self, args):
@@ -678,7 +678,7 @@ class CheckTransformer(Transformer):
     def times_value(self, args):
         statement = ""
         if not (args[0] in guess_records[self.count_guess].keys()):
-            raise ValueError(f"Record not defined: {args[0]}")
+            raise ValueError(error_messages.undefined_record(args[0]))
         attribute = self.attributes_guess_check(args)
         if attribute != "int" and attribute != "any":
             raise ValueError(f"Expected int, received: {attribute}")
@@ -700,11 +700,10 @@ class CheckTransformer(Transformer):
         return self.range_define(args)
 
     def value_guess_2(self, args):
-        if not (args[0] in self.guess_alias.keys() or args[0] in self.guess_records or args[0] in guess_records[
-            self.count_guess].keys()):
-            raise ValueError(f"{args[0]} is not defined")
+        if not (args[0] in self.guess_alias.keys() or args[0] in self.guess_records or args[0] in guess_records[self.count_guess].keys()):
+            raise ValueError(error_messages.undefined_element(args[0]))
         elif args[0] in self.aggr_alias:
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_element(args[0]))
         return self.value_guess_check(args)
 
     def isNum(self, args):
@@ -756,11 +755,11 @@ class CheckTransformer(Transformer):
             if "." in exp:
                 rec = exp.split(".")[0]
                 if rec in self.aggr_new_alias.keys():
-                    raise ValueError(f"{self.aggr_new_alias[rec]} is not defined")
+                    raise ValueError(error_messages.undefined_element(self.aggr_new_alias[rec]))
             else:
                 rec = exp.split("/")[0]
                 if rec in self.aggr_new_alias.keys():
-                    raise ValueError(f"{self.aggr_new_alias[rec]} is not defined")
+                    raise ValueError(error_messages.undefined_element(self.aggr_new_alias[rec]))
         self.define_expressions = []
         return self.where_stat_check(args).replace("$", "/")
 
@@ -970,7 +969,7 @@ class CheckTransformer(Transformer):
         if args[0].type == "INT":
             return args[0]
         if args[0] in self.aggr_alias:
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_element(args[0]))
         attribute = self.value_guess(args)
         types = attribute.split("/")
         if not types[1] == "int":
@@ -998,7 +997,7 @@ class CheckTransformer(Transformer):
                 all_en = en
                 en = en.split(".")[0]
             if not (en in declared_alias.keys() or en in defined_records):
-                raise ValueError(f"Undefined record: {en}")
+                raise ValueError(error_messages.undefined_record(en))
             if all_en != "":
                 if en in declared_alias.keys():
                     attribute = declared_alias[en]
@@ -1044,13 +1043,13 @@ class CheckTransformer(Transformer):
             check = index + 1
         if args[check] in self.aggr_alias or args[check] in guess_records[self.count_guess].keys():
             if check != index:
-                raise ValueError(f"Alias already defined: {args[check]}")
-            raise ValueError(f"Record already defined: {args[check]}")
+                raise ValueError(error_messages.alias_defined(args[check]))
+            raise ValueError(error_messages.record_defined(args[check]))
         for alias in guess_alias[self.count_guess].keys():
             if alias != "number":
                 en = guess_records[self.count_guess][alias]
                 if recursive and en == args[index]:
-                    raise ValueError("Cyclic dependency detected")
+                    raise ValueError(error_messages.CYCLIC_DEPENDENCY)
                 self.increment_num(en)
                 g.add_edge(num_pred[args[index]], num_pred[en])
         if len(args) > index + 1:
@@ -1231,14 +1230,14 @@ class CheckTransformer(Transformer):
         if len(from_guess) > 0:
             self.add_edge_guess(from_guess, args[0])
         if not (args[0] in records.keys()):
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_alias(args[0]))
         alias = ""
         if len(args) > 2:
             if args[1] in self.guess_alias:
-                raise ValueError(f"Alias already defined: {args[1]}")
+                raise ValueError(error_messages.alias_defined(args[1]))
             for en in self.guess_check:
                 if en != args[1]:
-                    raise ValueError(f"Alias is not defined: {en}")
+                    raise ValueError(error_messages.undefined_alias(en))
             self.guess_check = []
             if args[1] in guess_alias[self.count_guess].keys():
                 alias = guess_alias[self.count_guess][args[1]]
@@ -1246,10 +1245,10 @@ class CheckTransformer(Transformer):
             self.guess_records = set()
             return f"{args[0]}() as {alias} {args[2]}"
         elif args[0] in self.guess_records:
-            raise ValueError(f"Record already defined: {args[0]}")
+            raise ValueError(error_messages.record_defined(args[0]))
         for en in self.guess_check:
             if en != args[0]:
-                raise ValueError(f"Record is not defined: {en}")
+                raise ValueError(error_messages.undefined_record(en))
         self.guess_check = []
         self.guess_alias = {}
         self.guess_records = set()
@@ -1274,7 +1273,7 @@ class CheckTransformer(Transformer):
                 self.increment_num(arg)
                 for t in temp:
                     if recursive and arg == t:
-                        raise ValueError("Cyclic dependency detected")
+                        raise ValueError(error_messages.CYCLIC_DEPENDENCY)
                     g.add_edge(num_pred[arg], num_pred[t])
         return self.print_stat(args)
 
@@ -1290,7 +1289,7 @@ class CheckTransformer(Transformer):
             negated = True
             args = args[1:]
         if not args[0] in records.keys():
-            raise ValueError(f"Undefined record: {args[0]}")
+            raise ValueError(error_messages.undefined_record(args[0]))
         if len(args) > 1:
             alias = self.add_number_guess(args[1])
             self.new_guess_alias[args[1]] = alias
@@ -1346,11 +1345,11 @@ class CheckTransformer(Transformer):
             negated = True
             args = args[1:]
         if not args[0] in records.keys():
-            raise ValueError(f"Undefined record: {args[0]}")
+            raise ValueError(error_messages.undefined_record(args[0]))
         if len(args) > 1:
             alias = self.add_number_guess(args[1])
             if args[1] in self.guess_alias.keys():
-                raise ValueError(f"Alias already defined: {args[1]}")
+                raise ValueError(error_messages.alias_defined(args[1]))
             self.guess_alias[args[1]] = args[0]
             self.new_guess_alias[args[1]] = alias
             if negated:
@@ -1360,7 +1359,7 @@ class CheckTransformer(Transformer):
             return f"{args[0]}() as {alias}"
         alias = self.number_guess(args[0])
         if args[0] in self.guess_records:
-            raise ValueError(f"Record already defined: {args[0]}")
+            raise error_messages.record_defined(args[0])
         self.guess_records.add(args[0])
         self.new_guess_alias[args[0]] = alias
         if negated:
@@ -1698,7 +1697,7 @@ class CheckTransformer(Transformer):
 
     def pay(self, args):
         if args[0] in self.aggr_alias:
-            raise ValueError(f"{args[0]} is not defined")
+            raise ValueError(error_messages.undefined_element(args[0]))
         attribute = self.value_define(args)
         types = attribute.split("/")
         if not types[1] == "int":
@@ -1781,7 +1780,7 @@ class CheckTransformer(Transformer):
         for i in range(len(args)):
             if args[i] != "," and args[i] != ";":
                 if not args[i] in records.keys():
-                    raise ValueError(f"Undefined record: {args[i]}")
+                    raise error_messages.undefined_record(args[i])
                 global list_show
                 list_show.append(args[i].value)
         return ""
@@ -1859,7 +1858,7 @@ class CheckTransformer(Transformer):
             for i in range(2, len(args), 2):
                 if args[i - 1] == ".":
                     if attribute == "str" or attribute == "int":
-                        raise ValueError(f"{attribute} object has no attribute {args[i]}")
+                        raise ValueError(error_messages.no_attribute(attribute, args[i]))
                     found = False
                     for t in records[attribute]:
                         if t.value == args[i]:
@@ -1867,7 +1866,7 @@ class CheckTransformer(Transformer):
                             found = True
                             break
                     if not found:
-                        raise ValueError(f"{attribute} object has no attribute {args[i]}")
+                        raise ValueError(error_messages.no_attribute(attribute, args[i]))
                 else:
                     break
         return attribute
