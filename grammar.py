@@ -253,6 +253,7 @@ class DeclarationTransformer(Transformer):
 		return args
 	def guess(self, args):
 		self.count_guess+=1
+		self.count=0
 		guess[self.count_guess]=[]
 		guess_records[self.count_guess]={}
 		guess_alias[self.count_guess]={}
