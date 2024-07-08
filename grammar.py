@@ -471,6 +471,9 @@ class CheckTransformer(Transformer):
     def range_var(self, args):
         return self.range_define(args)
 
+    def abs_var(self, args):
+        return self.abs_guess(args)
+
     def value(self, args):
         statement = ""
         if not (args[0] in self.defined_record or args[0] in self.redefined_record.keys()):
@@ -504,7 +507,7 @@ class CheckTransformer(Transformer):
                 if "/" in args[i]:
                     types = args[i].split("/")
                     if types[1] != "int" and types[1] != "any":
-                        raise ValueError(error_messages.UNSOPPURTED_ARITHMETIC_OPERATION)
+                        raise ValueError(error_messages.UNSUPPORTED_ARITHMETIC_OPERATION)
                     args[i] = types[0]
                     self.define_expressions.append(args[i])
                     term = "/" + types[1]
@@ -547,6 +550,9 @@ class CheckTransformer(Transformer):
         args[1] = self.verify_int(args[1])
         return f"domain({args[0]}, {args[1]})/int"
 
+    def abs_define(self, args):
+        return self.abs_guess(args)
+
     def exp_aggr_define(self, args):
         stat = ""
         operators = ["*", "+", "-", "$"]
@@ -568,7 +574,7 @@ class CheckTransformer(Transformer):
                 if "/" in args[i]:
                     types = args[i].split("/")
                     if types[1] != "int" and types[1] != "any":
-                        raise ValueError(error_messages.UNSOPPURTED_ARITHMETIC_OPERATION)
+                        raise ValueError(error_messages.UNSUPPORTED_ARITHMETIC_OPERATION)
                     args[i] = types[0]
                     term = "/" + types[1]
                 stat += args[i]
@@ -594,6 +600,9 @@ class CheckTransformer(Transformer):
     def range_aggr_define(self, args):
         return self.range_define(args)
 
+    def abs_aggr_define(self, args):
+        return self.abs_guess(args)
+
     def value_def(self, args):
         statement = ""
         attribute = self.attributes_check(args)
@@ -614,20 +623,34 @@ class CheckTransformer(Transformer):
                 raise ValueError(error_messages.undefined_element(args[0]))
         return self.value_def(args)
 
-    def range(self, args):
-        return f"domain({args[0]}, {args[3]})/int"
-
     def range2(self, args):
         return self.range_times(args)
 
+    def abs2(self, args):
+        arg=self.verify_int(args[1])
+        return "abs_v("+arg+")"
+
     def var_guess_exp(self, args):
         return self.exp_aggr_define(args)
+
+    def abs_guess(self, args):
+        arg=""
+        if(len(args)>3):
+        	arg=self.verify_int(args[2])
+        else:
+        	arg=self.verify_int(args[1])
+        if(len(args)>3):
+        	return "abs_v(-"+arg+")/int"
+        return "abs_v("+arg+")/int"
 
     def aggr_guess_exp(self, args):
         return self.exp_aggr_define(args)
 
     def var_aggr_guess(self, args):
         return self.var_define(args)
+
+    def abs_aggr_guess(self, args):
+        return self.abs_guess(args)
 
     def range_aggr_guess(self, args):
         return self.range_define(args)
@@ -675,6 +698,9 @@ class CheckTransformer(Transformer):
         args[1] = self.verify_int(args[1])
         return f"domain({args[0]}, {args[1]})"
 
+    def abs_times(self, args):
+    	return self.abs_guess(args).split("/")[0]
+
     def times_value(self, args):
         statement = ""
         if not (args[0] in guess_records[self.count_guess].keys()):
@@ -695,6 +721,9 @@ class CheckTransformer(Transformer):
 
     def var_guess_2(self, args):
         return self.var_define(args)
+
+    def abs_guess_2(self, args):
+        return self.abs_guess(args)
 
     def range_guess_2(self, args):
         return self.range_define(args)
@@ -830,7 +859,7 @@ class CheckTransformer(Transformer):
             else:
                 sum_array.append(True)
         if len(var) > 1 and False in sum_array:
-            raise ValueError(error_messages.UNSOPPURTED_ARITHMETIC_OPERATION)
+            raise ValueError(error_messages.UNSUPPORTED_ARITHMETIC_OPERATION)
         stat = "("
         for attr in args[0][0]:
             if attr != ",":
@@ -965,6 +994,9 @@ class CheckTransformer(Transformer):
     def aggregate_term_guess_exp(self, args):
         return self.exp_aggr_define(args)
 
+    def abs_term_guess(self, args):
+    	return self.abs_guess(args).split("/")[0]
+
     def aggregate_term_guess(self, args):
         if args[0].type == "INT":
             return args[0]
@@ -980,6 +1012,12 @@ class CheckTransformer(Transformer):
         if len(args) > 1:
             return self.range_times(args)
         return args[0]
+
+    def aggregate_terms_guess(self, args):
+        return self.aggregate_terms(args)
+
+    def abs_aggregate_term(self, args):
+        return self.abs_guess(args).split("/")[0]
 
     def aggregate_term(self, args):
         splitted = args[0].split("/")

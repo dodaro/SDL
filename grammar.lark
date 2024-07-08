@@ -30,7 +30,7 @@ guess_record: NOT? RECORD_NAME ("as" NAME)?
 where_guess: "where"  where_guess_statement (AND where_guess_statement)*
 where_guess_statement: var_guess_exp (operator var_guess_exp)
 guess_times: times times_exp (AND guess_times)*
-times_exp: (INT| times_value | range_times) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
+times_exp: (INT| times_value | range_times | abs_times) | times_exp (PLUS | MINUS | TIMES | DIVIDED_BY) times_exp | OB times_exp CB
 guess_definitions: guess_definition+
 guess_definition: RECORD_NAME ("as" NAME)? guess_declaration
 guess_declaration: guess_from? guess_where
@@ -70,7 +70,7 @@ deny_otherwise_1: "deny" deny_from where_deny aggregate?
 deny_otherwise_2: "deny" deny_from aggregate
 deny_otherwise_3: "deny" deny_from
 pay: (NAME | RECORD_NAME) (DOT NAME)+
-arithmetic_operation: (pay | INT | range2) | (PLUS | MINUS | TIMES | DIVIDED_BY) INT | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
+arithmetic_operation: (pay | INT | range2 | abs2) | (PLUS | MINUS) INT | arithmetic_operation (PLUS | MINUS | TIMES | DIVIDED_BY) arithmetic_operation | OB arithmetic_operation CB
 guess_aggregate: "having" aggr_def_guess (AND aggr_def_guess)*
 aggr_def_guess: (COUNT | SUM_OF | MIN | MAX) "{" aggr_body_guess (SEMICOLON aggr_body_guess)* "}" operator aggregate_term_guess_exp
 aggr_body_guess: aggr_body_guess1 | aggr_body_guess2
@@ -81,8 +81,10 @@ aggregate_from_guess: "from" aggr_record_guess (COMMA aggr_record_guess)*
 aggr_record_guess: NOT? RECORD_NAME ("as" NAME)?
 aggr_where_guess: "where" where_aggr_guess (AND where_aggr_guess)*
 where_aggr_guess: aggr_guess_exp operator aggr_guess_exp
-aggregate_term_guess_exp: aggregate_term_guess  | aggregate_term_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_guess_exp | OB aggregate_term_guess_exp CB
+aggregate_term_guess_exp: aggregate_terms_guess | abs_term_guess  | aggregate_term_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_guess_exp | OB aggregate_term_guess_exp CB
+aggregate_terms_guess: aggregate_term_guess (".." aggregate_term_guess)?
 aggregate_term_guess: ((NAME | RECORD_NAME) (DOT NAME)*)| INT
+abs_term_guess: ABS (MINUS)? aggregate_term_guess_exp ABS
 aggregate: "having" aggr_def (AND aggr_def)*
 aggr_def: (COUNT | SUM_OF | MIN | MAX) "{" aggr_body (SEMICOLON aggr_body)* "}" operator aggregate_term_exp
 aggr_body: aggr_body_1 | aggr_body_2
@@ -99,31 +101,40 @@ define_expression: var_define | define_expression (PLUS | MINUS | TIMES | DIVIDE
 var_expression: var | var_expression (PLUS | MINUS | TIMES | DIVIDED_BY) var_expression | OB var_expression CB
 aggregate_expression: (aggregate_record|INT) | aggregate_expression (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_expression | OB aggregate_expression CB
 aggregate_record: (NAME | RECORD_NAME) (DOT NAME)*
-aggregate_term_exp: aggregate_terms | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
+aggregate_term_exp: aggregate_terms | abs_aggregate_term | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
 aggregate_terms: aggregate_term (".." aggregate_term)?
+abs_aggregate_term: ABS (MINUS)? aggregate_term_exp ABS
 aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT
 var_guess_exp: var_guess | var_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp | OB var_guess_exp CB
 asp: /[^$]+/
-var_guess:  INT | STR | value_guess | range_guess
+var_guess:  INT | STR | value_guess | range_guess | abs_guess
+abs_guess: ABS (MINUS)? var_guess_exp ABS
 range_guess: (INT|value_guess) ".." (INT| value_guess)
 value_guess: (NAME | RECORD_NAME) (DOT NAME)*
 range_times: (INT| times_value) ".." (INT|times_value)
+abs_times: ABS (MINUS)? times_exp ABS
 times_value: (NAME | RECORD_NAME) (DOT NAME)+
 value: (NAME | RECORD_NAME) (DOT NAME)*
 var_guess_exp_2: var_guess_2  | var_guess_exp_2 (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp_2 | OB var_guess_exp_2 CB
-var_guess_2:  INT | STR | value_guess_2 | range_guess_2
+var_guess_2:  INT | STR | value_guess_2 | range_guess_2 | abs_guess_2
+abs_guess_2: ABS (MINUS)? var_guess_exp_2 ABS
 range_guess_2: (INT|value_guess_2) ".." (INT| value_guess_2)
-var: INT | STR | value | range_var
+var: INT | STR | value | range_var | abs_var
+abs_var: ABS (MINUS)? var_expression ABS
 range_var: (INT|value) ".." (INT| value)
 value_guess_2: (NAME | RECORD_NAME) (DOT NAME)*
-var_define: INT | STR | value_define | range_define
+var_define: INT | STR | value_define | range_define | abs_define
+abs_define: ABS (MINUS)? define_expression ABS
 range_define: (INT|value_define) ".." (INT|value_define)
 range2: (pay | INT) ".." (pay | INT)
+abs2: ABS arithmetic_operation ABS
 aggr_guess_exp: var_aggr_guess | aggr_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggr_guess_exp | OB aggr_guess_exp CB
 exp_aggr_define: var_aggr_define | exp_aggr_define (PLUS | MINUS | TIMES | DIVIDED_BY) exp_aggr_define | OB exp_aggr_define CB
-var_aggr_define: INT | STR | value_aggr_define | range_aggr_define
+var_aggr_define: INT | STR | value_aggr_define | range_aggr_define | abs_aggr_define
+abs_aggr_define: ABS (MINUS)? exp_aggr_define ABS
 range_aggr_define: (INT|value_aggr_define) ".." (INT|value_aggr_define)
-var_aggr_guess: INT | STR | value_aggr_guess | range_aggr_guess
+var_aggr_guess: INT | STR | value_aggr_guess | range_aggr_guess | abs_aggr_guess
+abs_aggr_guess: ABS (MINUS)? aggr_guess_exp ABS
 range_aggr_guess: (INT|value_aggr_guess) ".." (INT|value_aggr_guess)
 value_aggr_define: (NAME | RECORD_NAME) (DOT NAME)*
 value_aggr_guess: (NAME | RECORD_NAME) (DOT NAME)*
@@ -144,6 +155,7 @@ PLUS: "+"
 MINUS: "-"
 TIMES: "*"
 DIVIDED_BY: "/"
+ABS: "|"
 OB: "("
 CB: ")"
 EQUALITY: "=="
