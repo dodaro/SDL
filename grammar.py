@@ -98,6 +98,7 @@ class DeclarationTransformer(Transformer):
 
     def guess(self, _):
         self.count_guess += 1
+        self.count=0
         guess[self.count_guess] = []
         guess_records[self.count_guess] = {}
         guess_alias[self.count_guess] = {}
@@ -152,7 +153,6 @@ class DeclarationTransformer(Transformer):
         args = args + "_" + f"{self.count}"
         self.count += 1
         return args
-
 
 class CheckTransformer(Transformer):
     def __init__(self):
