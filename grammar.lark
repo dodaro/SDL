@@ -82,7 +82,7 @@ aggr_record_guess: NOT? RECORD_NAME ("as" NAME)?
 aggr_where_guess: "where" where_aggr_guess (AND where_aggr_guess)*
 where_aggr_guess: aggr_guess_exp operator aggr_guess_exp
 aggregate_term_guess_exp: aggregate_terms_guess | abs_term_guess  | aggregate_term_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_guess_exp | OB aggregate_term_guess_exp CB
-aggregate_terms_guess: aggregate_term_guess (".." aggregate_term_guess)?
+aggregate_terms_guess: aggregate_term_guess (DOUBLEDOT aggregate_term_guess)?
 aggregate_term_guess: ((NAME | RECORD_NAME) (DOT NAME)*)| INT
 abs_term_guess: ABS (MINUS)? aggregate_term_guess_exp ABS
 aggregate: "having" aggr_def (AND aggr_def)*
@@ -102,40 +102,40 @@ var_expression: var | var_expression (PLUS | MINUS | TIMES | DIVIDED_BY) var_exp
 aggregate_expression: (aggregate_record|INT) | aggregate_expression (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_expression | OB aggregate_expression CB
 aggregate_record: (NAME | RECORD_NAME) (DOT NAME)*
 aggregate_term_exp: aggregate_terms | abs_aggregate_term | aggregate_term_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggregate_term_exp | OB aggregate_term_exp CB
-aggregate_terms: aggregate_term (".." aggregate_term)?
-abs_aggregate_term: ABS (MINUS)? aggregate_term_exp ABS
-aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | INT
+aggregate_terms: aggregate_term (DOUBLEDOT aggregate_term)?
+abs_aggregate_term: ABS aggregate_term_exp ABS
+aggregate_term: ((NAME | RECORD_NAME) (DOT NAME)*) | (PLUS|MINUS)? INT
 var_guess_exp: var_guess | var_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp | OB var_guess_exp CB
 asp: /[^$]+/
-var_guess:  INT | STR | value_guess | range_guess | abs_guess
-abs_guess: ABS (MINUS)? var_guess_exp ABS
-range_guess: (INT|value_guess) ".." (INT| value_guess)
+var_guess:  (PLUS|MINUS)? INT | STR | value_guess | range_guess | abs_guess
+abs_guess: ABS var_guess_exp ABS
+range_guess: (((PLUS|MINUS)? INT)|value_guess) DOUBLEDOT (((PLUS|MINUS)? INT)|value_guess)
 value_guess: (NAME | RECORD_NAME) (DOT NAME)*
-range_times: (INT| times_value) ".." (INT|times_value)
-abs_times: ABS (MINUS)? times_exp ABS
+range_times: (((PLUS|MINUS)? INT)| times_value) DOUBLEDOT (((PLUS|MINUS)? INT)|times_value)
+abs_times: ABS times_exp ABS
 times_value: (NAME | RECORD_NAME) (DOT NAME)+
 value: (NAME | RECORD_NAME) (DOT NAME)*
 var_guess_exp_2: var_guess_2  | var_guess_exp_2 (PLUS | MINUS | TIMES | DIVIDED_BY) var_guess_exp_2 | OB var_guess_exp_2 CB
-var_guess_2:  INT | STR | value_guess_2 | range_guess_2 | abs_guess_2
-abs_guess_2: ABS (MINUS)? var_guess_exp_2 ABS
-range_guess_2: (INT|value_guess_2) ".." (INT| value_guess_2)
-var: INT | STR | value | range_var | abs_var
-abs_var: ABS (MINUS)? var_expression ABS
-range_var: (INT|value) ".." (INT| value)
+var_guess_2:  (PLUS|MINUS)? INT | STR | value_guess_2 | range_guess_2 | abs_guess_2
+abs_guess_2: ABS var_guess_exp_2 ABS
+range_guess_2: (((PLUS|MINUS)? INT)|value_guess_2) DOUBLEDOT (((PLUS|MINUS)? INT)|value_guess_2)
+var: (PLUS|MINUS)? INT | STR | value | range_var | abs_var
+abs_var: ABS var_expression ABS
+range_var: (((PLUS|MINUS)? INT|value)) DOUBLEDOT (((PLUS|MINUS)? INT)| value)
 value_guess_2: (NAME | RECORD_NAME) (DOT NAME)*
-var_define: INT | STR | value_define | range_define | abs_define
-abs_define: ABS (MINUS)? define_expression ABS
-range_define: (INT|value_define) ".." (INT|value_define)
-range2: (pay | INT) ".." (pay | INT)
+var_define: (PLUS|MINUS)? INT | STR | value_define | range_define | abs_define
+abs_define: ABS define_expression ABS
+range_define: (((PLUS|MINUS)? INT)|value_define) DOUBLEDOT (((PLUS|MINUS)? INT)|value_define)
+range2: (pay | (PLUS|MINUS)? INT) DOUBLEDOT (pay | (PLUS|MINUS)? INT)
 abs2: ABS arithmetic_operation ABS
 aggr_guess_exp: var_aggr_guess | aggr_guess_exp (PLUS | MINUS | TIMES | DIVIDED_BY) aggr_guess_exp | OB aggr_guess_exp CB
 exp_aggr_define: var_aggr_define | exp_aggr_define (PLUS | MINUS | TIMES | DIVIDED_BY) exp_aggr_define | OB exp_aggr_define CB
-var_aggr_define: INT | STR | value_aggr_define | range_aggr_define | abs_aggr_define
-abs_aggr_define: ABS (MINUS)? exp_aggr_define ABS
-range_aggr_define: (INT|value_aggr_define) ".." (INT|value_aggr_define)
-var_aggr_guess: INT | STR | value_aggr_guess | range_aggr_guess | abs_aggr_guess
-abs_aggr_guess: ABS (MINUS)? aggr_guess_exp ABS
-range_aggr_guess: (INT|value_aggr_guess) ".." (INT|value_aggr_guess)
+var_aggr_define: (PLUS|MINUS)? INT | STR | value_aggr_define | range_aggr_define | abs_aggr_define
+abs_aggr_define: ABS exp_aggr_define ABS
+range_aggr_define: (((PLUS|MINUS)? INT)|value_aggr_define) DOUBLEDOT (((PLUS|MINUS)? INT)|value_aggr_define)
+var_aggr_guess: (PLUS|MINUS)? INT | STR | value_aggr_guess | range_aggr_guess | abs_aggr_guess
+abs_aggr_guess: ABS aggr_guess_exp ABS
+range_aggr_guess: (((PLUS|MINUS)? INT)|value_aggr_guess) DOUBLEDOT (((PLUS|MINUS)? INT)|value_aggr_guess)
 value_aggr_define: (NAME | RECORD_NAME) (DOT NAME)*
 value_aggr_guess: (NAME | RECORD_NAME) (DOT NAME)*
 value_define: (NAME | RECORD_NAME) (DOT NAME)*
@@ -147,6 +147,7 @@ attr_type: ANY | STRING | INTEGER | RECORD_NAME | REGEX
 REGEX: "r"/"[^"]+"/
 NAME: /[a-z_][a-z0-9_]*/
 RECORD_NAME: /[A-Z][a-zA-Z0-9_]*/
+DOUBLEDOT: ".."
 COLON: ":"
 SEMICOLON: ";"
 COMMA: ","

@@ -533,8 +533,11 @@ class CheckTransformer(Transformer):
         if isinstance(args[0], Token):
             type_value = args[0].type.lower()
             if type_value == "str":
-                args[0] = f"'{args[0]}'"
-            args[0] += f"/{type_value}"
+                args[0] = f"'{args[0]}'/str"
+            elif type_value == "minus":
+                return args[0]+args[1]+f"/int"
+            else:
+                args[0] += f"/{type_value}"
         return self.print_stat(args)
 
     def verify_int(self, arg):
@@ -546,12 +549,23 @@ class CheckTransformer(Transformer):
         return arg
 
     def range_define(self, args):
+        if args[0]=="-" or args[0]=="+":
+            args[1]=self.verify_int(args[1])
+            if args[3]=="-" or args[3]=="+":
+                args[4]=self.verify_int(args[4])
+                return f"domain({args[0]}{args[1]}, {args[3]}{args[4]})/int"
+            else:
+                return f"domain({args[0]}{args[1]}, {args[3]})/int"
+        elif args[2]=="-" or args[2]=="+":
+                args[3]=self.verify_int(args[3])
+                return f"domain({args[0]}, {args[2]}{args[3]})/int"
         args[0] = self.verify_int(args[0])
-        args[1] = self.verify_int(args[1])
-        return f"domain({args[0]}, {args[1]})/int"
+        args[2] = self.verify_int(args[2])
+        return f"domain({args[0]}, {args[2]})/int"
 
     def abs_define(self, args):
-        return self.abs_guess(args)
+        arg = self.verify_int(args[1])
+        return "abs_v(" + arg + ")/int"
 
     def exp_aggr_define(self, args):
         stat = ""
@@ -624,7 +638,7 @@ class CheckTransformer(Transformer):
         return self.value_def(args)
 
     def range2(self, args):
-        return self.range_times(args)
+        return self.range_define(args).split("/")[0]
 
     def abs2(self, args):
         arg=self.verify_int(args[1])
@@ -694,9 +708,7 @@ class CheckTransformer(Transformer):
         return stat
 
     def range_times(self, args):
-        args[0] = self.verify_int(args[0])
-        args[1] = self.verify_int(args[1])
-        return f"domain({args[0]}, {args[1]})"
+        return self.range_define(args).split("/")[0]
 
     def abs_times(self, args):
     	return self.abs_guess(args).split("/")[0]
@@ -1021,6 +1033,9 @@ class CheckTransformer(Transformer):
 
     def aggregate_term(self, args):
         splitted = args[0].split("/")
+        print(args[0])
+        if args[0] == "-" or args[0]=="+":
+            return args[0] + args[1]
         if len(splitted) > 1:
             return splitted[0]
         if args[0].type == "INT":
