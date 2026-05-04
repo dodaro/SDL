@@ -1,0 +1,126 @@
+record Nurse: id: int;
+record Day: id: int;
+record Shift: id: int, hours: int;
+
+/* Limits for the total working hours per nurse over the entire period */
+record HoursLimits: min: int, max: int;
+
+/* Limits for the number of times a specific shift can be assigned to a nurse over the entire period */
+record DayLimits: shift: Shift, min: int, max: int;
+
+/* Limits for the number of nurses required for a specific shift on any given day (Hospital Coverage) */
+record NurseLimits: shift: Shift, min: int, max: int;
+
+/* Maps a Nurse and a Day to a specific Shift */
+record Assign: nurse: Nurse, shift: Shift, day: Day;
+
+/* Each nurse must be assigned to exactly one shift per day. */
+guess from Day, Nurse 
+    exactly 1
+    Assign from Shift
+    where Assign.nurse == Nurse and Assign.shift == Shift and Assign.day == Day;
+
+/* Maximum staff limit: Do not exceed the maximum number of nurses allowed for a specific shift on a single day. */
+deny from Day, NurseLimits
+    having count {
+        Assign.nurse from Assign 
+        where Assign.shift.id == NurseLimits.shift.id and Assign.day.id == Day.id
+    } > NurseLimits.max;
+
+/* Minimum staff limit: Ensure there are enough nurses assigned to a specific shift on a single day. */
+deny from Day, NurseLimits
+    having count {
+        Assign.nurse from Assign 
+        where Assign.shift.id == NurseLimits.shift.id and Assign.day.id == Day.id
+    } < NurseLimits.min;
+
+/* Maximum working hours: A nurse cannot exceed the maximum allowed total working hours. */
+deny from Nurse, HoursLimits
+    having sum {
+        Shift.hours, Assign.day from Assign, Shift 
+        where Assign.nurse.id == Nurse.id and Assign.shift.id == Shift.id and Assign.shift.hours == Shift.hours
+    } > HoursLimits.max;
+
+/* Minimum working hours: A nurse must reach the minimum required total working hours. */
+deny from Nurse, HoursLimits
+    having sum {
+        Shift.hours, Assign.day from Assign, Shift 
+        where Assign.nurse.id == Nurse.id and Assign.shift.id == Shift.id and Assign.shift.hours == Shift.hours
+    } < HoursLimits.min;
+
+/* Exactly two specific shifts (Shift 6, e.g., special training or vacation) must be assigned per nurse. */
+deny from Nurse
+    having count {
+        Assign.day from Assign 
+        where Assign.nurse.id == Nurse.id and Assign.shift.id == 6
+    } != 2;
+
+/* A nurse cannot transition from a late shift to an early shift on consecutive days. 
+   (e.g., working an afternoon/evening shift and then a morning shift the next day is forbidden). */
+deny from Nurse, Assign as a1, Assign as a2
+    where a1.nurse.id == Nurse.id and a2.nurse.id == Nurse.id 
+    and a2.shift.id < a1.shift.id and a1.day.id+1 == a2.day.id 
+    and a2.shift.id <= 3 and a1.shift.id <= 3;
+
+/* Every nurse must have at least two occurrences of Shift 5 (e.g., weekend off) within any 14-day sliding window. */
+deny from Nurse, Day
+    where Day.id <= 17
+    having count {
+        Assign.day from Assign 
+        where Assign.nurse.id == Nurse.id and Assign.shift.id == 5 
+        and Assign.day.id == Day.id .. Day.id+13
+    } < 2;    
+
+/* If a nurse works two consecutive night shifts (Shift 3), the third day must be a recovery day (Shift 4). */
+deny from Assign as a2, Assign as a3, not Assign as a1
+    where a1.nurse.id == a2.nurse.id and a1.nurse.id == a3.nurse.id 
+    and a2.shift.id == 3 and a3.shift.id == 3 and a1.shift.id == 4 
+    and a3.day.id == a2.day.id + 1 
+    and a1.day.id == a3.day.id + 1;
+
+/* A recovery day (Shift 4) can only happen if the nurse worked a night shift (Shift 3) two days prior... */
+deny from Assign as a1, not Assign as a2
+    where a1.nurse.id == a2.nurse.id and a1.shift.id == 4 
+    and a2.shift.id == 3 and a2.day.id == a1.day.id-2;
+
+/* ...or one day prior. (Meaning, Shift 4 is exclusively reserved for post-night shift recovery). */
+deny from Assign as a1, not Assign as a2
+    where a1.nurse.id == a2.nurse.id and a1.shift.id == 4 
+    and a2.shift.id == 3 and a2.day.id == a1.day.id-1;
+
+/* A nurse cannot exceed the maximum allowed number of specific shifts over the entire scheduling horizon. */
+deny from Nurse, DayLimits
+    having count{
+        Assign.day from Assign 
+        where Assign.shift.id == DayLimits.shift.id and Assign.nurse.id == Nurse.id
+    } > DayLimits.max;
+
+/* A nurse must meet the minimum required number of specific shifts over the entire scheduling horizon. */
+deny from Nurse, DayLimits
+    having count{
+        Assign.day from Assign 
+        where Assign.shift.id == DayLimits.shift.id and Assign.nurse.id == Nurse.id
+    } < DayLimits.min;
+
+/* Problem Data */
+define Day where Day.id == 1..30;
+define Nurse where Nurse.id == 1..10;
+
+define Shift where Shift.id == 1 and Shift.hours == 7;
+define Shift where Shift.id == 2 and Shift.hours == 7;
+define Shift where Shift.id == 3 and Shift.hours == 10;
+define Shift where Shift.id == 4 and Shift.hours == 0;
+define Shift where Shift.id == 5 and Shift.hours == 0;
+define Shift where Shift.id == 6 and Shift.hours == 0;
+
+define HoursLimits where HoursLimits.min == 130 and HoursLimits.max == 145;
+
+define NurseLimits where NurseLimits.shift.id == 1 and NurseLimits.shift.hours == 7 and NurseLimits.min == 2 and NurseLimits.max == 3;
+define NurseLimits where NurseLimits.shift.id == 2 and NurseLimits.shift.hours == 7 and NurseLimits.min == 2 and NurseLimits.max == 3;
+define NurseLimits where NurseLimits.shift.id == 3 and NurseLimits.shift.hours == 10 and NurseLimits.min == 1 and NurseLimits.max == 2;
+
+define DayLimits where DayLimits.shift.id == 1 and DayLimits.shift.hours == 7 and DayLimits.min == 6 and DayLimits.max == 8;
+define DayLimits where DayLimits.shift.id == 2 and DayLimits.shift.hours == 7 and DayLimits.min == 6 and DayLimits.max == 8;
+define DayLimits where DayLimits.shift.id == 3 and DayLimits.shift.hours == 10 and DayLimits.min == 4 and DayLimits.max == 6;
+
+show Assign;

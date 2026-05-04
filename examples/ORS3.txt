@@ -1,0 +1,278 @@
+/* Represents a patient to be scheduled */
+record Registration: 
+    id: int, 
+    priority: int, 
+    surgery_duration: int, 
+    length_of_stay: int, 
+    specialty: int, 
+    icu_days: int, 
+    advance_admission: int;
+
+/* Represents a Medical Surgical Session (an operating room time slot) */
+record Mss: 
+    room: int, 
+    sequence: int, 
+    specialty: int, 
+    day: int;
+
+/* Represents the maximum available surgery time for a specific room and sequence */
+record Duration: 
+    max_minutes: int, 
+    room: int, 
+    sequence: int;
+
+/* Represents the daily bed capacity for standard wards and ICU */
+record Beds: 
+    specialty: int, 
+    available_beds: int, 
+    day: int;
+
+/* Represents the scheduling horizon (days) */
+record Day: 
+    id: int;
+
+/* The decision variable: maps a patient to a medical surgical session */
+record Assign: 
+    registration: Registration, 
+    mss: Mss;
+
+/* Derived fact: a patient occupying a standard hospital bed on a specific day */
+record Stay: 
+    registration: Registration, 
+    day: Day;
+
+/* Derived fact: a patient occupying an Intensive Care Unit (ICU) bed on a specific day */
+record StayICU: 
+    registration: Registration, 
+    day: Day;
+
+/* Generates the possible assignments of patients to surgical sessions.
+   A patient can only be assigned to a session if their required medical specialty 
+   matches the specialty of the session.
+*/
+guess from Registration, Mss
+    Assign
+    where Assign.registration == Registration 
+      and Assign.mss == Mss 
+      and Registration.specialty == Mss.specialty;
+
+/* A patient cannot be scheduled for two different sequences (time slots) in the same operating room */
+deny from Assign as a1, Assign as a2
+    where a1.registration == a2.registration 
+      and a1.mss.room == a2.mss.room 
+      and a1.mss.sequence != a2.mss.sequence;
+
+/* A patient cannot be scheduled in two different operating rooms during the exact same sequence (time slot) */
+deny from Assign as a1, Assign as a2
+    where a1.registration == a2.registration 
+      and a1.mss.sequence == a2.mss.sequence 
+      and a1.mss.room != a2.mss.room;
+
+/* The total surgery duration of all patients assigned to a specific room and sequence cannot exceed its maximum duration */
+deny from Duration
+    having sum {
+        Assign.registration.surgery_duration, Assign.registration from Assign
+        where Assign.mss.room == Duration.room 
+          and Assign.mss.sequence == Duration.sequence
+    } > Duration.max_minutes;
+
+/* Calculates pre-surgery ward stay based on admission days in advance */
+define Stay
+    from Assign, Day
+    where Assign.registration.advance_admission > 0
+      and Day.id >= Assign.mss.day - Assign.registration.advance_admission
+      and Day.id < Assign.mss.day
+      and Stay.registration == Assign.registration
+      and Stay.day == Day;
+
+/* Calculates post-ICU ward stay based on total length of stay and ICU days */
+define Stay
+    from Assign, Day
+    where Assign.registration.length_of_stay > Assign.registration.icu_days
+      and Day.id >= Assign.mss.day + Assign.registration.icu_days
+      and Day.id < Assign.mss.day + Assign.registration.length_of_stay
+      and Stay.registration == Assign.registration
+      and Stay.day == Day;
+
+/* Calculates Intensive Care Unit (ICU) stay directly after surgery */
+define StayICU
+    from Assign, Day
+    where Assign.registration.icu_days > 0
+      and Day.id >= Assign.mss.day
+      and Day.id < Assign.mss.day + Assign.registration.icu_days
+      and StayICU.registration == Assign.registration
+      and StayICU.day == Day;
+
+/* Standard ward bed capacity: Staying patients for a specialty on a specific day cannot exceed available beds */
+deny from Beds
+    where Beds.specialty > 0
+    having count {
+        Stay.registration from Stay
+        where Stay.registration.specialty == Beds.specialty 
+          and Stay.day.id == Beds.day
+    } > Beds.available_beds;
+
+/* ICU bed capacity (specialty == 0): Total patients in the ICU on a specific day cannot exceed available ICU beds */
+deny from Beds
+    where Beds.specialty == 0
+    having count {
+        StayICU.registration from StayICU
+        where StayICU.day.id == Beds.day
+    } > Beds.available_beds;
+
+/* Priority 1 patients are mandatory. They must be assigned at least once. */
+deny from Registration
+    where Registration.priority == 1
+    having count {
+        Assign.registration.id from Assign where Assign.registration.id == Registration.id
+    } == 0;
+
+/* Priority 2 patients are highly important. If unassigned, incur a heavy penalty at level 3. */
+deny from Registration
+    where Registration.priority == 2
+    having count {
+        Assign.registration.id from Assign where Assign.registration.id == Registration.id
+    } == 0
+    or pay 1 at 3;
+
+/* Priority 3 patients are less urgent. If unassigned, incur a lighter penalty at level 2. */
+deny from Registration
+    where Registration.priority == 3
+    having count {
+        Assign.registration.id from Assign where Assign.registration.id == Registration.id
+    } == 0
+    or pay 1 at 2;
+
+deny from Registration
+    having count { Assign from Assign
+                   where Assign.registration == Registration } > 1;
+
+/* Tell the solver to output the final assignments */
+show Assign;
+
+/* -------- STATIC DATA: DAYS, MSS, DURATION -------- */
+define Day where Day.id == 1..5;
+
+/* Master Surgical Schedule (MSS) – 10 ORs, 2 sessions per day, 5 days */
+define Mss where Mss.room == 1 and Mss.sequence == 1..2 and Mss.specialty == 1 and Mss.day == 1..5;
+define Mss where Mss.room == 2 and Mss.sequence == 1..2 and Mss.specialty == 1 and Mss.day == 1..5;
+define Mss where Mss.room == 3 and Mss.sequence == 1..2 and Mss.specialty == 1 and Mss.day == 1..5;
+define Mss where Mss.room == 4 and Mss.sequence == 1..2 and Mss.specialty == 2 and Mss.day == 1..5;
+define Mss where Mss.room == 5 and Mss.sequence == 1..2 and Mss.specialty == 2 and Mss.day == 1..5;
+define Mss where Mss.room == 6 and Mss.sequence == 1..2 and Mss.specialty == 3 and Mss.day == 1..5;
+define Mss where Mss.room == 7 and Mss.sequence == 1..2 and Mss.specialty == 3 and Mss.day == 1..5;
+define Mss where Mss.room == 8 and Mss.sequence == 1..2 and Mss.specialty == 4 and Mss.day == 1..5;
+define Mss where Mss.room == 9 and Mss.sequence == 1..2 and Mss.specialty == 5 and Mss.day == 1..5;
+define Mss where Mss.room == 10 and Mss.sequence == 1..2 and Mss.specialty == 5 and Mss.day == 1..5;
+
+/* Session durations (all 300 minutes, i.e., 5 hours) */
+define Duration where Duration.max_minutes == 300 and Duration.room == 1..10 and Duration.sequence == 1..2;
+
+/* -------- BED AVAILABILITY – SCENARIO B (Table 2) -------- */
+/* ICU (specialty 0) */
+define Beds where Beds.specialty == 0 and Beds.available_beds == 4 and Beds.day == 1;
+define Beds where Beds.specialty == 0 and Beds.available_beds == 4 and Beds.day == 2;
+define Beds where Beds.specialty == 0 and Beds.available_beds == 5 and Beds.day == 3;
+define Beds where Beds.specialty == 0 and Beds.available_beds == 5 and Beds.day == 4;
+define Beds where Beds.specialty == 0 and Beds.available_beds == 6 and Beds.day == 5;
+
+/* Specialty 1 */
+define Beds where Beds.specialty == 1 and Beds.available_beds == 20 and Beds.day == 1;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 30 and Beds.day == 2;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 40 and Beds.day == 3;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 45 and Beds.day == 4;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 50 and Beds.day == 5;
+
+/* Specialty 2 */
+define Beds where Beds.specialty == 2 and Beds.available_beds == 10 and Beds.day == 1;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 15 and Beds.day == 2;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 23 and Beds.day == 3;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 30 and Beds.day == 4;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 35 and Beds.day == 5;
+
+/* Specialty 3 */
+define Beds where Beds.specialty == 3 and Beds.available_beds == 10 and Beds.day == 1;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 14 and Beds.day == 2;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 21 and Beds.day == 3;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 30 and Beds.day == 4;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 35 and Beds.day == 5;
+
+/* Specialty 4 */
+define Beds where Beds.specialty == 4 and Beds.available_beds == 8 and Beds.day == 1;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 10 and Beds.day == 2;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 14 and Beds.day == 3;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 16 and Beds.day == 4;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 18 and Beds.day == 5;
+
+/* Specialty 5 */
+define Beds where Beds.specialty == 5 and Beds.available_beds == 10 and Beds.day == 1;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 14 and Beds.day == 2;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 20 and Beds.day == 3;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 23 and Beds.day == 4;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 25 and Beds.day == 5;
+
+/* -------- REGISTRATIONS (50 total, 10 per specialty) -------- */
+/* Based on Table 4 parameters. Priorities: 20% P1, 40% P2, 40% P3.
+   advance_admission = 1 for specialties 1,2,3; = 0 for 4,5.
+   ICU days: 1 for about 10% of patients (here randomly assigned).
+   surgery_duration and length_of_stay around the means with some variation. */
+
+/* Specialty 1 (mean SU=124, mean LOS=7.91, ICU 10%) */
+define Registration where Registration.id ==  1 and Registration.priority == 1 and Registration.surgery_duration == 124 and Registration.length_of_stay == 8 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  2 and Registration.priority == 1 and Registration.surgery_duration == 130 and Registration.length_of_stay == 9 and Registration.specialty == 1 and Registration.icu_days == 1 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  3 and Registration.priority == 2 and Registration.surgery_duration == 115 and Registration.length_of_stay == 7 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  4 and Registration.priority == 2 and Registration.surgery_duration == 124 and Registration.length_of_stay == 8 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  5 and Registration.priority == 2 and Registration.surgery_duration == 140 and Registration.length_of_stay == 8 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  6 and Registration.priority == 2 and Registration.surgery_duration == 110 and Registration.length_of_stay == 9 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  7 and Registration.priority == 3 and Registration.surgery_duration == 120 and Registration.length_of_stay == 7 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  8 and Registration.priority == 3 and Registration.surgery_duration == 135 and Registration.length_of_stay == 8 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id ==  9 and Registration.priority == 3 and Registration.surgery_duration == 124 and Registration.length_of_stay == 9 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 10 and Registration.priority == 3 and Registration.surgery_duration == 118 and Registration.length_of_stay == 7 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+
+/* Specialty 2 (mean SU=99, mean LOS=9.81, ICU 10%) */
+define Registration where Registration.id == 11 and Registration.priority == 1 and Registration.surgery_duration == 99 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 12 and Registration.priority == 1 and Registration.surgery_duration == 105 and Registration.length_of_stay == 11 and Registration.specialty == 2 and Registration.icu_days == 1 and Registration.advance_admission == 1;
+define Registration where Registration.id == 13 and Registration.priority == 2 and Registration.surgery_duration == 90 and Registration.length_of_stay == 9 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 14 and Registration.priority == 2 and Registration.surgery_duration == 99 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 15 and Registration.priority == 2 and Registration.surgery_duration == 110 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 16 and Registration.priority == 2 and Registration.surgery_duration == 95 and Registration.length_of_stay == 11 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 17 and Registration.priority == 3 and Registration.surgery_duration == 99 and Registration.length_of_stay == 9 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 18 and Registration.priority == 3 and Registration.surgery_duration == 100 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 19 and Registration.priority == 3 and Registration.surgery_duration == 85 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 20 and Registration.priority == 3 and Registration.surgery_duration == 102 and Registration.length_of_stay == 11 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+
+/* Specialty 3 (mean SU=134, mean LOS=11.06, ICU 10%) */
+define Registration where Registration.id == 21 and Registration.priority == 1 and Registration.surgery_duration == 134 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 22 and Registration.priority == 1 and Registration.surgery_duration == 140 and Registration.length_of_stay == 12 and Registration.specialty == 3 and Registration.icu_days == 1 and Registration.advance_admission == 1;
+define Registration where Registration.id == 23 and Registration.priority == 2 and Registration.surgery_duration == 120 and Registration.length_of_stay == 10 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 24 and Registration.priority == 2 and Registration.surgery_duration == 134 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 25 and Registration.priority == 2 and Registration.surgery_duration == 145 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 26 and Registration.priority == 2 and Registration.surgery_duration == 128 and Registration.length_of_stay == 12 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 27 and Registration.priority == 3 and Registration.surgery_duration == 134 and Registration.length_of_stay == 10 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 28 and Registration.priority == 3 and Registration.surgery_duration == 150 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 29 and Registration.priority == 3 and Registration.surgery_duration == 125 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+define Registration where Registration.id == 30 and Registration.priority == 3 and Registration.surgery_duration == 130 and Registration.length_of_stay == 12 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
+
+/* Specialty 4 (mean SU=95, mean LOS=6.36, ICU 10%, advance_admission = 0) */
+define Registration where Registration.id == 31 and Registration.priority == 1 and Registration.surgery_duration == 95 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 32 and Registration.priority == 1 and Registration.surgery_duration == 100 and Registration.length_of_stay == 7 and Registration.specialty == 4 and Registration.icu_days == 1 and Registration.advance_admission == 0;
+define Registration where Registration.id == 33 and Registration.priority == 2 and Registration.surgery_duration == 85 and Registration.length_of_stay == 5 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 34 and Registration.priority == 2 and Registration.surgery_duration == 95 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 35 and Registration.priority == 2 and Registration.surgery_duration == 105 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 36 and Registration.priority == 2 and Registration.surgery_duration == 90 and Registration.length_of_stay == 7 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 37 and Registration.priority == 3 and Registration.surgery_duration == 95 and Registration.length_of_stay == 5 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 38 and Registration.priority == 3 and Registration.surgery_duration == 100 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 39 and Registration.priority == 3 and Registration.surgery_duration == 88 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 40 and Registration.priority == 3 and Registration.surgery_duration == 95 and Registration.length_of_stay == 7 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+
+/* Specialty 5 (mean SU=105, mean LOS=2.48, ICU 10%, advance_admission = 0) */
+define Registration where Registration.id == 41 and Registration.priority == 1 and Registration.surgery_duration == 105 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 42 and Registration.priority == 1 and Registration.surgery_duration == 110 and Registration.length_of_stay == 3 and Registration.specialty == 5 and Registration.icu_days == 1 and Registration.advance_admission == 0;
+define Registration where Registration.id == 43 and Registration.priority == 2 and Registration.surgery_duration == 95 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 44 and Registration.priority == 2 and Registration.surgery_duration == 105 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 45 and Registration.priority == 2 and Registration.surgery_duration == 115 and Registration.length_of_stay == 3 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 46 and Registration.priority == 2 and Registration.surgery_duration == 100 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 47 and Registration.priority == 3 and Registration.surgery_duration == 105 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 48 and Registration.priority == 3 and Registration.surgery_duration == 120 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 49 and Registration.priority == 3 and Registration.surgery_duration == 98 and Registration.length_of_stay == 3 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
+define Registration where Registration.id == 50 and Registration.priority == 3 and Registration.surgery_duration == 105 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;

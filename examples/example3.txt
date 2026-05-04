@@ -1,72 +1,55 @@
-@entity Resolution: value: int;
-@entity Video: type: str;
-@entity F: video: Video, resolution: Resolution, bit_rate: Bit_rate, sat_value: Sat;
-@entity Bit_rate: value: int;
-@entity Sat: value: int;
-@entity User: id: int, video: Video, resolution: Resolution, max_sat: Sat, max_bit: Bit_rate;
-@entity MaxRepresentation: value: int;
-@entity R: video: Video, resolution: Resolution, bit_rate: Bit_rate, sat_value: Sat;
-@entity GlobalCapacity: value: int;
-@entity Assign: user:User, bit_rate: Bit_rate, sat_value: Sat;
-@entity FractionUser: value: int;
+record Node: id: int;
+record Edge: first: Node, second: Node;
+record Color: value: str;
+record Assign: node: Node, color: Color;
 
 
-guess from MaxRepresentation as m
-	where m.value=2
-		exactly m.value
-			R as r
-				from F as f, User as user
-					where r.bit_rate.value<=user.max_bit.value and user.video=r.video and user.resolution=r.resolution and f.video=r.video and f.resolution=r.resolution and f.bit_rate=r.bit_rate and f.sat_value=r.sat_value;
+define Node as n
+	where n.id==1;	
+define Node as n
+	where n.id==2;
+define Node as n
+	where n.id==3;
+define Node as n
+	where n.id==4;
+define Node as n
+	where n.id==5;
+guess from Node as n
+    exactly 1 
+	Assign as a
+        	from Color
+            		where a.node==n and a.color==Color;
+            
+deny from Assign as a1, Assign as a2, Edge
+    where  a1.node.id != a2.node.id and a1.color == a2.color and Edge.first == a1.node and Edge.second==a2.node;
 
-guess from User as user, Bit_rate as n, Video as v
-	where user.max_bit=n and user.max_bit.value=2
-		Assign as a
-			from F as f
-				where f.bit_rate.value<=user.max_bit.value and f.video=user.video and f.resolution=user.resolution and a.user=user and a.bit_rate=f.bit_rate and a.sat_value=f.sat_value;
+define Edge as e
+    from Node as n1, Node as n2
+        where e.first == n1 and e.second== n2 and n1.id==1 and n2.id==2;
 
+define Edge as e
+	from Node as n1, Node as n2
+	where e.first==n1 and e.second==n2 and n1.id==1 and n2.id==2;
+define Edge as e
+	from Node as n1, Node as n2
+	where e.first==n1 and e.second==n2 and n1.id==2 and n2.id==3;
+define Edge as e
+	from Node as n1, Node as n2
+	where e.first==n1 and e.second==n2 and n1.id==3 and n2.id==4;
+define Edge as e
+	from Node as n1, Node as n2
+	where e.first==n1 and e.second==n2 and n1.id==1 and n2.id==4;
+define Edge as e
+	from Node as n1, Node as n2
+	where e.first==n1 and e.second==n2 and n1.id==2 and n2.id==4;
+define Edge as e
+	from Node as n1, Node as n2
+	where e.first==n1 and e.second==n2 and n1.id==4 and n2.id==5;
+define Color as c
+	where c.value=="red";
+define Color as c
+	where c.value=="yellow";
+define Color as c
+	where c.value=="green";
 
-define Sat
-	from F as f
-		count of {f2.video from F as f2 where f2.video=f.video}>0
-		where Sat.value=2 and f.sat_value=Sat;
-
-define Bit_rate as b
-	from Assign as a, not Sat as s
-		where a.sat_value.value=s.value and a.bit_rate=b;
-
-define Sat
-	from Assign as a, Video as v
-		where a.sat_value.value=Sat.value and a.user.video=v;
-
-deny from User as user, Assign as a, Resolution as r, Video as v, Bit_rate as b, Sat as s
-	where user.resolution=r and user.video=v and user.max_bit=b and user.max_sat=s and a.user=user;
-
-@entity Bandwidth: value: int;
-
-guess from F, Resolution as r
-	where F.resolution.value==1 and F.resolution=r and r.value<=4
-		at_most 1 and at_least F.resolution.value
-			Bit_rate as b2
-				where b2.value=F.resolution.value
-			Sat
-				from Assign as a3, Bit_rate
-					where a3.sat_value=Sat and a3.sat_value.value=2;
-
-deny from Assign as a, Sat as s
-	where a.sat_value.value=1 and a.sat_value=s;
-
-
-deny unless R as r 
-	from Assign as a 
-		min of {r2.resolution.value from R as r2}>2
-		where r.video=a.user.video and r.resolution=a.user.resolution and r.bit_rate=a.bit_rate and r.sat_value=a.sat_value;
-
-
-deny unless Bit_rate as b or Bandwidth as band
-	from Sat as s
-		where b.value=s.value and band.value=s.value
-			or pay b.value at s.value;
-
-deny from Sat
-	where Sat.value=2
-		or pay 1 at 3;
+show Assign;

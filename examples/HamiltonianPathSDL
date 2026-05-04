@@ -28,5 +28,18 @@ define Reached as r1
 deny from Node, not Reached
 	where Node == Reached.node;
 
+define Node where Node.id == 1;
+define Node where Node.id == 2;
+define Node where Node.id == 3;
+define Node where Node.id == 4;
+
+define Arc where Arc.first.id == 1 and Arc.second.id == 2;
+define Arc where Arc.first.id == 2 and Arc.second.id == 3;
+define Arc where Arc.first.id == 3 and Arc.second.id == 4;
+define Arc where Arc.first.id == 4 and Arc.second.id == 1;
+define Arc where Arc.first.id == 1 and Arc.second.id == 3;
+define Arc where Arc.first.id == 2 and Arc.second.id == 4;
+
+define Start where Start.node.id == 1;
 
 show InCycle;
