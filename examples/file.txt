@@ -1,0 +1,7 @@
+record Cab: 
+  id: int,
+  driver: str;
+define Cab where Cab.id == 1 and Cab.driver == "Alice";
+define Cab where Cab.id == 2 and Cab.driver == "Bob";
+ 
+show Cab;

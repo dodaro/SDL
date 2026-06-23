@@ -165,10 +165,10 @@ define Mss where Mss.room == 8 and Mss.sequence == 1..2 and Mss.specialty == 4 a
 define Mss where Mss.room == 9 and Mss.sequence == 1..2 and Mss.specialty == 5 and Mss.day == 1..5;
 define Mss where Mss.room == 10 and Mss.sequence == 1..2 and Mss.specialty == 5 and Mss.day == 1..5;
 
-/* Session durations (all 300 minutes, i.e., 5 hours) */
+/* Session durations */
 define Duration where Duration.max_minutes == 300 and Duration.room == 1..10 and Duration.sequence == 1..2;
 
-/* -------- BED AVAILABILITY – SCENARIO C (Table 3) -------- */
+/* -------- BED AVAILABILITY – SCENARIO B -------- */
 /* ICU (specialty 0) */
 define Beds where Beds.specialty == 0 and Beds.available_beds == 4 and Beds.day == 1;
 define Beds where Beds.specialty == 0 and Beds.available_beds == 4 and Beds.day == 2;
@@ -177,47 +177,42 @@ define Beds where Beds.specialty == 0 and Beds.available_beds == 5 and Beds.day 
 define Beds where Beds.specialty == 0 and Beds.available_beds == 6 and Beds.day == 5;
 
 /* Specialty 1 */
-define Beds where Beds.specialty == 1 and Beds.available_beds == 10 and Beds.day == 1;
-define Beds where Beds.specialty == 1 and Beds.available_beds == 15 and Beds.day == 2;
-define Beds where Beds.specialty == 1 and Beds.available_beds == 20 and Beds.day == 3;
-define Beds where Beds.specialty == 1 and Beds.available_beds == 25 and Beds.day == 4;
-define Beds where Beds.specialty == 1 and Beds.available_beds == 30 and Beds.day == 5;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 20 and Beds.day == 1;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 30 and Beds.day == 2;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 40 and Beds.day == 3;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 45 and Beds.day == 4;
+define Beds where Beds.specialty == 1 and Beds.available_beds == 50 and Beds.day == 5;
 
 /* Specialty 2 */
-define Beds where Beds.specialty == 2 and Beds.available_beds == 7 and Beds.day == 1;
-define Beds where Beds.specialty == 2 and Beds.available_beds == 10 and Beds.day == 2;
-define Beds where Beds.specialty == 2 and Beds.available_beds == 11 and Beds.day == 3;
-define Beds where Beds.specialty == 2 and Beds.available_beds == 14 and Beds.day == 4;
-define Beds where Beds.specialty == 2 and Beds.available_beds == 18 and Beds.day == 5;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 10 and Beds.day == 1;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 15 and Beds.day == 2;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 23 and Beds.day == 3;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 30 and Beds.day == 4;
+define Beds where Beds.specialty == 2 and Beds.available_beds == 35 and Beds.day == 5;
 
 /* Specialty 3 */
-define Beds where Beds.specialty == 3 and Beds.available_beds == 7 and Beds.day == 1;
-define Beds where Beds.specialty == 3 and Beds.available_beds == 10 and Beds.day == 2;
-define Beds where Beds.specialty == 3 and Beds.available_beds == 13 and Beds.day == 3;
-define Beds where Beds.specialty == 3 and Beds.available_beds == 16 and Beds.day == 4;
-define Beds where Beds.specialty == 3 and Beds.available_beds == 20 and Beds.day == 5;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 10 and Beds.day == 1;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 14 and Beds.day == 2;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 21 and Beds.day == 3;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 30 and Beds.day == 4;
+define Beds where Beds.specialty == 3 and Beds.available_beds == 35 and Beds.day == 5;
 
 /* Specialty 4 */
-define Beds where Beds.specialty == 4 and Beds.available_beds == 4 and Beds.day == 1;
-define Beds where Beds.specialty == 4 and Beds.available_beds == 6 and Beds.day == 2;
-define Beds where Beds.specialty == 4 and Beds.available_beds == 8 and Beds.day == 3;
-define Beds where Beds.specialty == 4 and Beds.available_beds == 11 and Beds.day == 4;
-define Beds where Beds.specialty == 4 and Beds.available_beds == 13 and Beds.day == 5;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 8 and Beds.day == 1;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 10 and Beds.day == 2;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 14 and Beds.day == 3;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 16 and Beds.day == 4;
+define Beds where Beds.specialty == 4 and Beds.available_beds == 18 and Beds.day == 5;
 
 /* Specialty 5 */
-define Beds where Beds.specialty == 5 and Beds.available_beds == 6 and Beds.day == 1;
-define Beds where Beds.specialty == 5 and Beds.available_beds == 9 and Beds.day == 2;
-define Beds where Beds.specialty == 5 and Beds.available_beds == 12 and Beds.day == 3;
-define Beds where Beds.specialty == 5 and Beds.available_beds == 15 and Beds.day == 4;
-define Beds where Beds.specialty == 5 and Beds.available_beds == 18 and Beds.day == 5;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 10 and Beds.day == 1;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 14 and Beds.day == 2;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 20 and Beds.day == 3;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 23 and Beds.day == 4;
+define Beds where Beds.specialty == 5 and Beds.available_beds == 25 and Beds.day == 5;
 
 /* -------- REGISTRATIONS (50 total, 10 per specialty) -------- */
-/* Based on Table 4 parameters. Priorities: 20% P1, 40% P2, 40% P3.
-   advance_admission = 1 for specialties 1,2,3; = 0 for 4,5.
-   ICU days: 1 for about 10% of patients (here randomly assigned).
-   surgery_duration and length_of_stay around the means with some variation. */
-
-/* Specialty 1 (mean SU=124, mean LOS=7.91, ICU 10%) */
+/* Specialty 1 */
 define Registration where Registration.id ==  1 and Registration.priority == 1 and Registration.surgery_duration == 124 and Registration.length_of_stay == 8 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 define Registration where Registration.id ==  2 and Registration.priority == 1 and Registration.surgery_duration == 130 and Registration.length_of_stay == 9 and Registration.specialty == 1 and Registration.icu_days == 1 and Registration.advance_admission == 1;
 define Registration where Registration.id ==  3 and Registration.priority == 2 and Registration.surgery_duration == 115 and Registration.length_of_stay == 7 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
@@ -229,7 +224,7 @@ define Registration where Registration.id ==  8 and Registration.priority == 3 a
 define Registration where Registration.id ==  9 and Registration.priority == 3 and Registration.surgery_duration == 124 and Registration.length_of_stay == 9 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 define Registration where Registration.id == 10 and Registration.priority == 3 and Registration.surgery_duration == 118 and Registration.length_of_stay == 7 and Registration.specialty == 1 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 
-/* Specialty 2 (mean SU=99, mean LOS=9.81, ICU 10%) */
+/* Specialty 2 */
 define Registration where Registration.id == 11 and Registration.priority == 1 and Registration.surgery_duration == 99 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 define Registration where Registration.id == 12 and Registration.priority == 1 and Registration.surgery_duration == 105 and Registration.length_of_stay == 11 and Registration.specialty == 2 and Registration.icu_days == 1 and Registration.advance_admission == 1;
 define Registration where Registration.id == 13 and Registration.priority == 2 and Registration.surgery_duration == 90 and Registration.length_of_stay == 9 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
@@ -241,7 +236,7 @@ define Registration where Registration.id == 18 and Registration.priority == 3 a
 define Registration where Registration.id == 19 and Registration.priority == 3 and Registration.surgery_duration == 85 and Registration.length_of_stay == 10 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 define Registration where Registration.id == 20 and Registration.priority == 3 and Registration.surgery_duration == 102 and Registration.length_of_stay == 11 and Registration.specialty == 2 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 
-/* Specialty 3 (mean SU=134, mean LOS=11.06, ICU 10%) */
+/* Specialty 3 */
 define Registration where Registration.id == 21 and Registration.priority == 1 and Registration.surgery_duration == 134 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 define Registration where Registration.id == 22 and Registration.priority == 1 and Registration.surgery_duration == 140 and Registration.length_of_stay == 12 and Registration.specialty == 3 and Registration.icu_days == 1 and Registration.advance_admission == 1;
 define Registration where Registration.id == 23 and Registration.priority == 2 and Registration.surgery_duration == 120 and Registration.length_of_stay == 10 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
@@ -253,7 +248,7 @@ define Registration where Registration.id == 28 and Registration.priority == 3 a
 define Registration where Registration.id == 29 and Registration.priority == 3 and Registration.surgery_duration == 125 and Registration.length_of_stay == 11 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 define Registration where Registration.id == 30 and Registration.priority == 3 and Registration.surgery_duration == 130 and Registration.length_of_stay == 12 and Registration.specialty == 3 and Registration.icu_days == 0 and Registration.advance_admission == 1;
 
-/* Specialty 4 (mean SU=95, mean LOS=6.36, ICU 10%, advance_admission = 0) */
+/* Specialty 4 */
 define Registration where Registration.id == 31 and Registration.priority == 1 and Registration.surgery_duration == 95 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
 define Registration where Registration.id == 32 and Registration.priority == 1 and Registration.surgery_duration == 100 and Registration.length_of_stay == 7 and Registration.specialty == 4 and Registration.icu_days == 1 and Registration.advance_admission == 0;
 define Registration where Registration.id == 33 and Registration.priority == 2 and Registration.surgery_duration == 85 and Registration.length_of_stay == 5 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
@@ -265,7 +260,7 @@ define Registration where Registration.id == 38 and Registration.priority == 3 a
 define Registration where Registration.id == 39 and Registration.priority == 3 and Registration.surgery_duration == 88 and Registration.length_of_stay == 6 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
 define Registration where Registration.id == 40 and Registration.priority == 3 and Registration.surgery_duration == 95 and Registration.length_of_stay == 7 and Registration.specialty == 4 and Registration.icu_days == 0 and Registration.advance_admission == 0;
 
-/* Specialty 5 (mean SU=105, mean LOS=2.48, ICU 10%, advance_admission = 0) */
+/* Specialty 5 */
 define Registration where Registration.id == 41 and Registration.priority == 1 and Registration.surgery_duration == 105 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;
 define Registration where Registration.id == 42 and Registration.priority == 1 and Registration.surgery_duration == 110 and Registration.length_of_stay == 3 and Registration.specialty == 5 and Registration.icu_days == 1 and Registration.advance_admission == 0;
 define Registration where Registration.id == 43 and Registration.priority == 2 and Registration.surgery_duration == 95 and Registration.length_of_stay == 2 and Registration.specialty == 5 and Registration.icu_days == 0 and Registration.advance_admission == 0;

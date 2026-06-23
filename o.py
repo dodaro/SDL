@@ -1,39 +1,41 @@
 from pyspel.pyspel import *
 
 @atom
+class Color:
+	value: any
+@atom
 class Node:
-	id: int
+	value: int
 @atom
 class Edge:
-	first: Node
-	second: Node
-@atom
-class Color:
-	value: str
+	node1: Node
+	node2: Node
 @atom
 class Assign:
 	node: Node
 	color: Color
+@atom
+class Ciao:
+	assign: Assign
+	int2: int
 
-problem5 = Problem()
+problem58 = Problem()
 
-with Node() as n_1, Assign() as a_0, Color() as c_2:
-	problem5+=When(n_1).guess({a_0:(c_2, Literal(Atom(Predicate(f"{a_0.node}=={n_1}")), True),Literal(Atom(Predicate(f"{a_0.color}=={c_2}")), True))}, exactly=1)
-with Assign() as a1_0, Assign() as a2_1, Edge() as e_2:
-	problem5+=Assert(False).when(a1_0, a2_1, e_2, Literal(Atom(Predicate(f"{a1_0.node}!={a2_1.node}")), True), Literal(Atom(Predicate(f"{a1_0.color}=={a2_1.color}")), True), Literal(Atom(Predicate(f"{e_2.first}=={a1_0.node}")), True), Literal(Atom(Predicate(f"{e_2.second}=={a2_1.node}")), True))
+with Assign() as a_0:
+	problem58+=When(a_0.node.value==1, a_0.color.value=='"blue"').define(a_0)
+with Ciao() as a2_1, Assign() as a_2:
+	problem58+=When(a_2, Literal(Atom(Predicate(f"{a2_1.assign.node}=={a_2.node}")), True), a2_1.assign.color.value==a_2.color.value, a2_1.int2==2).define(a2_1)
+with Color() as c_3:
+	problem58+=When(c_3.value=='"red"').define(c_3)
+with Node() as n_4:
+	problem58+=When(n_4.value==1).define(n_4)
+with Node() as n_5, Assign() as a2_7, Assign() as a4_8, Assign() as a_6:
+	problem58+=When(a_6, Max({(a2_7.node.value):(a2_7, a2_7.node.value==1)})>=n_5.value, Sum({(a4_8.node.value):(a4_8)})==1, n_5.value==a_6.node.value).define(n_5)
+with Color() as c_9, Assign() as a_10, Node() as n_11:
+	problem58+=When(a_10, n_11, Literal(Atom(Predicate(f"{a_10.color}=={c_9}")), True), n_11.value==5).define(c_9)
+with Node() as n_12, Assign() as a_13:
+	problem58+=When(a_13, Literal(Atom(Predicate(f"{a_13.node}=={n_12}")), True), n_12.value>1).define(n_12)
+with Edge() as e_14, Edge() as e2_15, Assign() as a_16:
+	problem58+=When(e2_15, a_16, Literal(Atom(Predicate(f"{e2_15.node1}=={e_14.node1}")), True), Literal(Atom(Predicate(f"{e_14.node2}=={a_16.node}")), True)).define(e_14)
 
-solver = SolverWrapper(solver_path="C:/Users/Hp/miniconda3/envs/potassco/Library/bin/clingo.exe")
-res = solver.solve(problem=problem5, timeout=100)
-if res.status == Result.HAS_SOLUTION:
-    num = 0
-    for answer in res.answers:
-        num += 1
-        print("Solution #"+str(num)+": ", end="")
-        result = answer.get_atom_occurrences(Assign())
-        result_str = [str(x) for x in result]
-        print(" ".join(result_str))
-elif res.status == Result.NO_SOLUTION:
-    print("UNSAT")
-else:
-    print("Unknown")
-    
+print(problem58)

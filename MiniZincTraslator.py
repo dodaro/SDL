@@ -7,22 +7,50 @@ class MinizincGenerator:
 
     def _build_output_string(self, root_rec, current_rec, idx_var, prefix=""):
         parts = []
-        for ad in self.v.records.get(current_rec, []):
+        for ad in self.v.get_flattened_attrs(current_rec):
             attr_name = ad['name']
             attr_type = ad['type']
-            new_prefix = f"{prefix}{attr_name}_"
-            
-            if attr_type in self.v.records:
-                inner = self._build_output_string(root_rec, attr_type, idx_var, new_prefix)
-                parts.append(f"{attr_type}({inner})")
-            else:
-                flat_attr = new_prefix.strip("_")
-                arr_name = f"{root_rec.lower()}_{flat_attr}"
-                if attr_type == 'str':
+            arr_name = f"{root_rec.lower()}_{attr_name}"
+            if attr_type in ['int', 'str', 'any']:
+                if self._is_string_attr(current_rec, attr_name):
                     parts.append(f"\\(global_strings[{arr_name}[{idx_var}]])")
                 else:
                     parts.append(f"\\({arr_name}[{idx_var}])")
+            else:
+                inner = self._build_output_string(root_rec, attr_type, idx_var, f"{prefix}{attr_name}_")
+                parts.append(f"{attr_type}({inner})")
         return ", ".join(parts)
+        
+    def _is_string_attr(self, record_name, attr_name):
+        attrs = self.v.records.get(record_name, [])
+        attr_type = None
+        for ad in attrs:
+            if ad['name'] == attr_name:
+                attr_type = ad['type']
+                break
+        
+        if attr_type is None:
+            return False
+            
+        if attr_type == 'str':
+            return True
+        if attr_type == 'any':
+            flat_attrs = self.v.get_flattened_attrs(record_name)
+            col_idx = None
+            for i, fad in enumerate(flat_attrs):
+                if fad['name'] == attr_name:
+                    col_idx = i
+                    break
+            if col_idx is not None:
+                fact_list = self.v.facts.get(record_name, [])
+                for tup in fact_list:
+                    if col_idx < len(tup):
+                        val = tup[col_idx]
+                        if val is not None and val in self.v.id_to_string:
+                            return True
+            return False
+            
+        return False
     
     def generate(self):
         minizinc_code = ""
@@ -385,7 +413,6 @@ class MinizincGenerator:
                 else:
                     val_expr = f"{actual_to}(\\({target_val}))"
             display_name = f"{target_rec}({display_keys})" if display_keys else target_rec
-            
             if to_rec_name:
                 string_to_print = f'"{display_name} -> {val_expr}\\n"'
             else:
@@ -428,20 +455,47 @@ class MinizincGenerator:
                 has_facts = len(set(self.v.facts.get(dim_actual, []))) > 0
                 if dim_actual in self.v.records and self.v.records[dim_actual] and has_facts:
                     inner_str = self._build_output_string(dim_actual, dim_actual, dim_idx_var)
-                    from_exprs.append(f"{dim_actual}({inner_str})")
+                    if inner_str.startswith(f"{dim_actual}("):
+                         from_exprs.append(inner_str)
+                    else:
+                         from_exprs.append(f"{dim_actual}({inner_str})")
                 else:
                     from_exprs.append(f"{dim_actual}(\\({dim_idx_var}))")
+            
             display_keys = ", ".join(from_exprs)
             arr_access = f"{target_rec.lower()}[{', '.join(idx_vars)}]" if idx_vars else target_rec.lower()
             minizinc_code += "output [\n"
             if not idx_vars:
                 minizinc_code += f'    if fix({arr_access}) then "{target_rec}\\n" else "" endif\n'
             else:
-                display_name = f"{target_rec}({display_keys})" if display_keys else target_rec
+                if display_keys.startswith(f"{target_rec}("):
+                    display_name = display_keys
+                else:
+                    display_name = f"{target_rec}({display_keys})"
                 minizinc_code += f'    "{display_name}\\n"\n'
                 minizinc_code += f"    | {loops_str} where fix({arr_access})\n"
             minizinc_code += "];\n"
             
+        for record_name in self.list_show:
+            if record_name in self.v.guess_domains:
+                continue  
+            if record_name in self.v.rule_bodies:
+                continue 
+            fact_list = self.v.facts.get(record_name, [])
+            if not fact_list:
+                continue
+            unique_sorted_facts = sorted(list(set(fact_list)))
+            if len(unique_sorted_facts) == 0:
+                continue
+            idx_var = "i_1"
+            loop_str = f"{idx_var} in 1..{record_name.lower()}_len"
+            inner_str = self._build_output_string(record_name, record_name, idx_var)
+            display_name = f"{record_name}({inner_str})" if inner_str else record_name
+            minizinc_code += "output [\n"
+            minizinc_code += f'    "{display_name}\\n"\n'
+            minizinc_code += f"    | {loop_str} where fix({record_name.lower()}[{idx_var}])\n" 
+            minizinc_code += "];\n"
+
         if hasattr(self.v, 'weak_constraints') and self.v.weak_constraints:
             levels_dict = {}
             for wc in self.v.weak_constraints:

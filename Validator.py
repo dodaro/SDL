@@ -1902,11 +1902,10 @@ class SDLValidator(Transformer):
             if rule.get('type') == 'guess' or rule.get('is_guess'):
                 self._process_guess(rule)
                 continue
-            if rule.get('is_define') and (rule.get('from_records') or rule.get('aggregates')):
-                if not rule.get('from_records') and not rule.get('aggregates'):
-                    continue
+            # RIMOSSI I CONTROLLI from_records E aggregates PER PROCESSARE ANCHE I FATTI STATICI
+            if rule.get('is_define'):
                 self._process_define(rule)
-
+                
     def def_1(self, args):
         clean_args = [arg for arg in args if str(arg) != ";"]
         targets = clean_args[0]
