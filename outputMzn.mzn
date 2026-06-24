@@ -11,6 +11,9 @@ int: assign_len = 1;
 array[1..assign_len] of int: assign_node_value = [1];
 array[1..assign_len] of int: assign_color_value = [1];
 
+int: ciao_int2_len = 1;
+array[1..ciao_int2_len] of int: ciao_int2_value = [2];
+
 
 array[1..node_len, 1..node_len] of var bool: edge;
 array[1..node_len, 1..node_len] of var 0..node_len * node_len: rank_edge;
@@ -33,11 +36,20 @@ constraint forall(edge_node1 in 1..node_len, edge_node2 in 1..node_len)(
 );
 
 array[1..node_len, 1..color_len] of var bool: assign;
+array[1..assign_len, 1..ciao_int2_len] of var bool: ciao;
 array[1..color_len] of var bool: color;
 array[1..node_len] of var bool: node;
 constraint forall(assign_node in 1..node_len, assign_color in 1..color_len)(
     assign[assign_node, assign_color] <-> (
       (node_value[assign_node] == 1 /\ color_value[assign_color] == 1)
+    )
+);
+
+constraint forall(ciao_assign in 1..assign_len, ciao_int2 in 1..ciao_int2_len)(
+    ciao[ciao_assign, ciao_int2] <-> (
+      (exists(a_base in 1..assign_len)(
+        assign_node_value[ciao_assign] == assign_node_value[a_base] /\ assign_color_value[ciao_assign] == assign_color_value[a_base] /\ ciao_int2_value[ciao_int2] == 2
+    ))
     )
 );
 
@@ -69,6 +81,10 @@ constraint forall(node_base in 1..node_len)(
 output [
     "Assign(Node(\(node_value[i_1])), Color(\(global_strings[color_value[i_2]])))\n"
     | i_1 in 1..node_len, i_2 in 1..color_len where fix(assign[i_1, i_2])
+];
+output [
+    "Ciao(Assign(\(assign_node_value[i_1]), \(assign_color_value[i_1])), Ciao_int2(\(ciao_int2_value[i_2])))\n"
+    | i_1 in 1..assign_len, i_2 in 1..ciao_int2_len where fix(ciao[i_1, i_2])
 ];
 output [
     "Color(\(global_strings[color_value[i_1]]))\n"

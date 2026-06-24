@@ -22,11 +22,13 @@ class MinizincGenerator:
         return ", ".join(parts)
         
     def _is_string_attr(self, record_name, attr_name):
-        attrs = self.v.records.get(record_name, [])
+        flat_attrs = self.v.get_flattened_attrs(record_name)
         attr_type = None
-        for ad in attrs:
-            if ad['name'] == attr_name:
-                attr_type = ad['type']
+        col_idx = None
+        for i, fad in enumerate(flat_attrs):
+            if fad['name'] == attr_name:
+                attr_type = fad['type']
+                col_idx = i
                 break
         
         if attr_type is None:
@@ -35,12 +37,7 @@ class MinizincGenerator:
         if attr_type == 'str':
             return True
         if attr_type == 'any':
-            flat_attrs = self.v.get_flattened_attrs(record_name)
-            col_idx = None
-            for i, fad in enumerate(flat_attrs):
-                if fad['name'] == attr_name:
-                    col_idx = i
-                    break
+            col_idx = col_idx
             if col_idx is not None:
                 fact_list = self.v.facts.get(record_name, [])
                 for tup in fact_list:
@@ -363,11 +360,24 @@ class MinizincGenerator:
                 dim_idx_var = idx_vars[idx]
                 dim_actual = dim
                 has_facts = len(set(self.v.facts.get(dim_actual, []))) > 0
-                if dim_actual in self.v.records and self.v.records[dim_actual] and has_facts:
+                pseudo_fields_g = self.v.records.get(dim_actual, [])
+                is_pseudo_rec_g = (
+                    dim_actual.lower().startswith(target_rec.lower() + "_") and
+                    len(pseudo_fields_g) == 1 and
+                    pseudo_fields_g[0]['name'] == 'value' and
+                    pseudo_fields_g[0]['type'] in ['int', 'str', 'any']
+                )
+                if is_pseudo_rec_g:
+                    arr_name_g = f"{dim_actual.lower()}_value"
+                    if self._is_string_attr(dim_actual, 'value'):
+                        from_exprs.append(f"\\(global_strings[{arr_name_g}[{dim_idx_var}]])")
+                    else:
+                        from_exprs.append(f"\\({arr_name_g}[{dim_idx_var}])")
+                elif dim_actual in self.v.records and self.v.records[dim_actual] and has_facts:
                     inner_str = self._build_output_string(dim_actual, dim_actual, dim_idx_var)
                     from_exprs.append(f"{dim_actual}({inner_str})")
                 else:
-                    from_exprs.append(f"{dim_actual}(\\({dim_idx_var}))")
+                    from_exprs.append(f"{dim_actual}(\\\\({dim_idx_var}))")
             display_keys = ", ".join(from_exprs)
             is_multi_target = len(to_recs) > 1
             if is_bool:
@@ -453,14 +463,27 @@ class MinizincGenerator:
                 dim_name = dim_str.split("..")[-1].replace("_len", "").strip()
                 dim_actual = next((k for k in self.v.records.keys() if k.lower() == dim_name), dim_name)
                 has_facts = len(set(self.v.facts.get(dim_actual, []))) > 0
-                if dim_actual in self.v.records and self.v.records[dim_actual] and has_facts:
+                pseudo_fields = self.v.records.get(dim_actual, [])
+                is_pseudo_rec = (
+                    dim_actual.lower().startswith(target_rec.lower() + "_") and
+                    len(pseudo_fields) == 1 and
+                    pseudo_fields[0]['name'] == 'value' and
+                    pseudo_fields[0]['type'] in ['int', 'str', 'any']
+                )
+                if is_pseudo_rec:
+                    arr_name = f"{dim_actual.lower()}_value"
+                    if self._is_string_attr(dim_actual, 'value'):
+                        from_exprs.append(f"\\(global_strings[{arr_name}[{dim_idx_var}]])")
+                    else:
+                        from_exprs.append(f"\\({arr_name}[{dim_idx_var}])")
+                elif dim_actual in self.v.records and self.v.records[dim_actual] and has_facts:
                     inner_str = self._build_output_string(dim_actual, dim_actual, dim_idx_var)
                     if inner_str.startswith(f"{dim_actual}("):
                          from_exprs.append(inner_str)
                     else:
                          from_exprs.append(f"{dim_actual}({inner_str})")
                 else:
-                    from_exprs.append(f"{dim_actual}(\\({dim_idx_var}))")
+                    from_exprs.append(f"{dim_actual}(\\\\({dim_idx_var}))")
             
             display_keys = ", ".join(from_exprs)
             arr_access = f"{target_rec.lower()}[{', '.join(idx_vars)}]" if idx_vars else target_rec.lower()
