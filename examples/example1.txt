@@ -2,17 +2,12 @@ record Color: value: any;
 record Node: value: int;
 record Edge: node1: Node, node2: Node;
 record Assign: node: Node, color: Color;
-record Ciao: assign: Assign, int2: int;
 
 
 define Assign as a 
 	where a.node.value==1 and a.color.value=="blue";
 	
-define Ciao as a2 
-	from Assign as a
-	where a2.assign.node==a.node and a2.assign.color.value==a.color.value and a2.int2==2;
-
-show Color, Node, Edge, Assign, Ciao;
+show Color, Node, Assign;
 
 define Color as c
 	where c.value=="red";
