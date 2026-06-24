@@ -1,0 +1,4 @@
+.idea/
+__pycache__/
+grammar.py
+result.mzn
